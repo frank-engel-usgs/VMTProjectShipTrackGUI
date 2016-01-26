@@ -24,6 +24,10 @@ log_text = {'   Processing Data...Please Be Patient.'};
 try
     %disp('Processing Data...')
     warning off
+    
+    if ~exist('start_bank','var')
+        start_bank = 'auto';
+    end
         
     %% Map ensembles to mean cross-section
     [A,V,map_xs_log_text] = VMT_MapEns2MeanXS(z,A,setends,start_bank);
