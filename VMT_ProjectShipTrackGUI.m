@@ -157,6 +157,15 @@ A = VMT_ProjectShipTracks(fullfiles,Endpoints,Station,Offsets,UTMzone);
   Map             = [];        % this would indicate if there was a saved
                                % Map file loaded. Set to empty matrix. 
  
+ % Adjust vertical grid size by bin size
+ if A(1).Sup.wm ~= 3 % RG
+%      set(handles.VerticalGridNodeSpacing,'String',double(A(1).Sup.binSize_cm(1))/100)
+     guiparams.vertical_grid_node_spacing = double(A(1).Sup.binSize_cm(1))/100;
+ else % Older file, must be RR or M9
+%      set(handles.VerticalGridNodeSpacing,'String',0.4)
+     guiparams.vertical_grid_node_spacing = 0.4;
+ end
+ 
 %%
 % Run the PreProcessing Engine
   A = VMT_PreProcess(z,A);

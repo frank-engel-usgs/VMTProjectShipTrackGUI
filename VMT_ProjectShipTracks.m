@@ -104,8 +104,19 @@ if isempty(Endpoints) || isempty(Station) || isempty(Offsets)
 end
 
 % Loop through each transect and process
+hf = figure('name','ProjectShiptracks'); clf
+set(gca,'DataAspectRatio',[1 1 1])
 for zi = 1:z
     disp(['Transect pass ' num2str(zi)])
+    
+    % If there is GPS data, go ahead and plot it
+    isGPS = any(~isnan(A(zi).Nav.lat_deg));
+    if isGPS
+        [xUTMraw, yUTMraw, utmzone] = deg2utm(...
+            A(zi).Nav.lat_deg,A(zi).Nav.long_deg);
+        plot(xUTMraw,yUTMraw,'b'); hold on
+    end
+    
     % Make a string of station for clarity
     if Station(zi) == 1
         sta{zi} = 'right';
@@ -123,7 +134,7 @@ for zi = 1:z
     disp(['   Endpoint distance:        ' num2str(dl)]);
         
     % Plot the line of the mean cross section
-    figure(1);hold on;plot([x1 x2],[y1 y2],'-'); axis equal
+    figure(hf);hold on;plot([x1 x2],[y1 y2],'-'); axis equal
     
     % Overwrite the original endpoints, moving them to where the ADCP probe
     % "started"
@@ -151,7 +162,7 @@ for zi = 1:z
         disp(['   Percent error:            ' num2str(per_err)]);
         
         % Plot where the ADCP started on the MCS, accounting for offsets
-        figure(1); hold on; plot([x1 x2],[y1 y2],'o');
+        figure(hf); hold on; plot([x1 x2],[y1 y2],'o');
         text(x1,y1,'LB'); text(x2,y2,'RB'); hold off
         
         % Scale the DMG to span from the ADCP starting points. This
@@ -223,7 +234,7 @@ for zi = 1:z
         disp(['   Percent error:            ' num2str(per_err)]);
         
         % Plot where the ADCP started on the MCS, accounting for offsets
-        figure(1); hold on; plot([x1 x2],[y1 y2],'o');
+        figure(hf); hold on; plot([x1 x2],[y1 y2],'o');
         text(x1,y1,'LB'); text(x2,y2,'RB'); hold off
         
         % Scale the DMG to span from the ADCP starting points. This

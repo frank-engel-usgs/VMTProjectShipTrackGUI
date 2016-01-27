@@ -3756,27 +3756,27 @@ handles.toolbarProcessingParameters = ...
 % Zoom In
 % [icon,map] = imread('C:\Users\pfricker\Desktop\icons\ParameterIcon.gif');
 % icon = ind2rgb(icon,map);
-% handles.toolbarZoomIn = ...
-%     uitoggletool('Parent',       ht, ...
-%     'CData',        icons(8).data, ...
-%     'TooltipString','Zoom In (Shiptracks)', ...
-%     'Separator',     'on');
+handles.toolbarZoomIn = ...
+    uitoggletool('Parent',       ht, ...
+    'CData',        icons(8).data, ...
+    'TooltipString','Zoom In (Shiptracks)', ...
+    'Separator',     'on');
 
 % Zoom Out
 % [icon,map] = imread('C:\Users\pfricker\Desktop\icons\ParameterIcon.gif');
 % icon = ind2rgb(icon,map);
-% handles.toolbarZoomOut = ...
-%     uitoggletool('Parent',       ht, ...
-%     'CData',        icons(9).data, ...
-%     'TooltipString','Zoom Out (Shiptracks)');
+handles.toolbarZoomOut = ...
+    uitoggletool('Parent',       ht, ...
+    'CData',        icons(9).data, ...
+    'TooltipString','Zoom Out (Shiptracks)');
 
 % Pan
 % [icon,map] = imread('C:\Users\pfricker\Desktop\icons\ParameterIcon.gif');
 % icon = ind2rgb(icon,map);
-% handles.toolbarPan = ...
-%     uipushtool('Parent',       ht, ...
-%     'CData',        icons(10).data, ...
-%     'TooltipString','Pan (Shiptracks)');
+handles.toolbarPan = ...
+    uipushtool('Parent',       ht, ...
+    'CData',        icons(10).data, ...
+    'TooltipString','Pan (Shiptracks)');
 
 
 
@@ -3787,12 +3787,14 @@ set(handles.toolbarSaveFigures,         'ClickedCallback',{@menuExportFigures_Ca
 set(handles.toolbarSaveExcel,           'ClickedCallback',{@menuSaveExcel_Callback,handles})
 set(handles.toolbarPlottingParameters,  'ClickedCallback',{@plottingParametersCallback,handles})
 set(handles.toolbarProcessingParameters,'ClickedCallback',{@processingParametersCallback,handles})
-% set(handles.toolbarZoomIn,              'ClickedCallback',{@ShiptracksZoom_Callback,handles})
-% set(handles.toolbarZoomOut,              'ClickedCallback',{@ShiptracksZoom_Callback,handles})
-% set(handles.toolbarPan,              'ClickedCallback',{@ShiptracksPan_Callback,handles})
+set(handles.toolbarZoomIn,              'ClickedCallback',{@ShiptracksZoom_Callback,handles})
+set(handles.toolbarZoomOut,             'ClickedCallback',{@ShiptracksZoom_Callback,handles})
+set(handles.toolbarPan,                 'ClickedCallback',{@ShiptracksPan_Callback,handles})
 % set(handles.planviewPlot,        'ClickedCallback',{@planviewPlotCallback,handles})
 % set(handles.crosssectionPlot,    'ClickedCallback',{@crosssectionPlotCallback,handles})
 
+h.ActionPreCallback = @myprecallback;
+h.ActionPostCallback = @mypostcallback;
 % [EOF] buildtoolbar
 
 
@@ -5710,9 +5712,13 @@ guiparams.gui_state   = 'init';
 % [EOF] createGUIparams
 
 function ShiptracksZoom_Callback(obj,evd,handles)
+ax = findobj('Tag','Plot1Shiptracks');
+axes(ax);
 ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM (when zooming) 
 
 function ShiptracksPan_Callback(obj,evd,handles)
+ax = findobj('Tag','Plot1Shiptracks');
+axes(ax);
 ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM (when panning) 
 
 % [EOF] VMT
@@ -5830,3 +5836,4 @@ switch input
     otherwise
         %disp(input)
 end
+
