@@ -22,7 +22,7 @@ function varargout = VMT_ProjectShipTrackGUI(varargin)
 
 % Edit the above text to modify the response to help VMT_ProjectShipTrackGUI
 
-% Last Modified by GUIDE v2.5 28-May-2014 14:32:00
+% Last Modified by GUIDE v2.5 28-Jan-2016 14:22:29
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -450,3 +450,48 @@ else
     % Reject and replace with default
     valid = false;
 end
+
+
+% --- Executes when entered data in editable cell(s) in FileList.
+function FileList_CellEditCallback(hObject, eventdata, handles)
+% hObject    handle to FileList (see GCBO)
+% eventdata  structure with the following fields (see MATLAB.UI.CONTROL.TABLE)
+%	Indices: row and column indices of the cell(s) edited
+%	PreviousData: previous data for the cell(s) edited
+%	EditData: string(s) entered by the user
+%	NewData: EditData or its converted form set on the Data property. Empty if Data was not changed
+%	Error: error string when failed to convert EditData to appropriate value for Data
+% handles    structure with handles and user data (see GUIDATA)
+%  Get Application Data
+guiparams = getappdata(handles.figure1,'guiparams');
+table_data = hObject.Data;
+
+changed = eventdata.Indices;
+if changed(2) == 2 || changed(2) == 3  % Left/Right Offset
+    if isnan(eventdata.NewData)
+        table_data{changed(1), changed(2)} = eventdata.PreviousData;
+        hObject.Data = table_data; % reset back to original value
+        warndlg('Offset distances must be a number, and in meters.')
+    end
+elseif changed(2) == 4 % Start Station
+    if ~strcmpi(eventdata.NewData,'l') && ...
+            ~strcmpi(eventdata.NewData,'r')
+        table_data{changed(1), changed(2)} = eventdata.PreviousData;
+        hObject.Data = table_data; % reset back to original value
+        warndlg('Start Station must be ''L'' or ''R'' (case insensitive).')
+    else
+        table_data{changed(1), changed(2)} = upper(eventdata.NewData);
+        hObject.Data = table_data;
+    end
+end
+
+guiparams.table_data = table_data;
+
+% Store result
+setappdata(handles.figure1,'guiparams',guiparams)
+
+        
+
+
+
+
