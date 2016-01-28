@@ -288,11 +288,24 @@ switch plotref
             contour_handle = pcolor(V.mcsDist*3.281,V.mcsDepth*3.281,eval(wtp)*convfact); hold on
             shading interp
             %[~,contour_handle] = contour(V.mcsDist*3.281,V.mcsDepth*3.281,eval(wtp)*convfact,zlevs*convfact,'Fill','on','Linestyle','none'); hold on  %wtp(1,:)
+            % Plot the individual ADCP transect bed elevations
+            if 1 % testing a feature
+                for zi = 1:z
+                    ibed_handle(zi) = plot(V.mcsDist(1,:)*3.281,A(zi).Comp.mcsBed*3.281,':','Color', [.7 .7 .7]);
+                end
+            end
             bed_handle         = plot(V.mcsDist(1,:)*3.281,V.mcsBed*3.281,'w', 'LineWidth',2); hold on
         else
             contour_handle = pcolor(V.mcsDist,V.mcsDepth,eval(wtp)); hold on
             shading interp
             %[~,contour_handle] = contour(V.mcsDist,V.mcsDepth,eval(wtp),zlevs,'Fill','on','Linestyle','none'); hold on  %wtp(1,:)
+            
+            % Plot the individual ADCP transect bed elevations
+            if 1 % testing a feature
+                for zi = 1:z
+                    ibed_handle(zi) = plot(V.mcsDist(1,:),A(zi).Comp.mcsBed,':','Color', [.7 .7 .7]);
+                end
+            end
             bed_handle         = plot(V.mcsDist(1,:),V.mcsBed,'w', 'LineWidth',2); hold on
         end
         
