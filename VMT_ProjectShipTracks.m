@@ -89,16 +89,17 @@ else % Arguement 1 is a cell of full paths to ASC files
     clear A
     for zi = 1:z
         fullName = files2load{zi};
+        [zPathName{zi},zFileName{zi},zExt{zi}] = fileparts(fullName); 
         [A(zi)] = tfile(fullName,1,0);
         disp(['ASCII File: ' fullName])
     end
-    zPathName = fileparts(fullName);
+    
 end
 
 % Check to see if the XS Input data were supplied
 if isempty(Endpoints) || isempty(Station) || isempty(Offsets)
     [INfile,INpath,~] = uigetfile(...
-        '*.mat','Select cross section input-MAT file',zPathName);
+        '*.mat','Select cross section input-MAT file',zPathName{1});
     load([INpath filesep INfile])
     disp(['Offset File: ' fullfile(INpath,INfile)])
 end
@@ -127,11 +128,11 @@ for zi = 1:z
     % Compute dx, dy, dl, & m of the line, always going from LB to RB
     x1 = Endpoints(1,1); x2 = Endpoints(2,1);
     y1 = Endpoints(1,2); y2 = Endpoints(2,2);
-    dl = hypot((x2-x1),(y2-y1));
+    dl(zi) = hypot((x2-x1),(y2-y1));
     m = atan((y2-y1)/(x2-x1));
     dmg{zi} = nanmax(A(zi).Nav.dmg);
     
-    disp(['   Endpoint distance:        ' num2str(dl)]);
+%     disp(['   Endpoint distance:        ' num2str(dl(zi))]);
         
     % Plot the line of the mean cross section
     figure(hf);hold on;plot([x1 x2],[y1 y2],'-'); axis equal
@@ -150,16 +151,17 @@ for zi = 1:z
             [x1, y1] = line_projection(x1,y1,-Offsets(zi,1),0,m);
             [x2, y2] = line_projection(x2,y2,Offsets(zi,2),0,m);
         end
-        dl2 = hypot((x2-x1),(y2-y1));
+        dl2(zi) = hypot((x2-x1),(y2-y1));
         
         % Compute positional error and display results
-        abs_err = abs(dl2 - dmg{zi});
-        per_err = (abs_err/abs(dl2)) * 100;
-        disp(['   Offset distance is:       ' num2str(dl2)]);
-        disp(['   Probe reported DMG:       ' num2str(dmg{zi})]);
-        disp(['   Probe max length:         ' num2str(nanmax(A(zi).Nav.length))]);
-        disp(['   Absolute error:           ' num2str(abs_err)]);
-        disp(['   Percent error:            ' num2str(per_err)]);
+        abs_err(zi) = abs(dl2(zi) - dmg{zi});
+        per_err(zi) = (abs_err(zi)/abs(dl2(zi))) * 100;
+        probe_length(zi) = nanmax(A(zi).Nav.length);
+%         disp(['   Offset distance is:       ' num2str(dl2(zi))]);
+%         disp(['   Probe reported DMG:       ' num2str(dmg{zi})]);
+%         disp(['   Probe max length:         ' num2str(probe_length(zi))]);
+%         disp(['   Absolute error:           ' num2str(abs_err(zi))]);
+%         disp(['   Percent error:            ' num2str(per_err(zi))]);
         
         % Plot where the ADCP started on the MCS, accounting for offsets
         figure(hf); hold on; plot([x1 x2],[y1 y2],'o');
@@ -170,7 +172,7 @@ for zi = 1:z
         for j = 1:A(zi).Sup.noe
             origLength(j) = A(zi).Nav.length(j);
             Ratio(j)      = origLength(j)/nanmax(A(zi).Nav.length);
-            adjLength(j)  = dl2*Ratio(j);
+            adjLength(j)  = dl2(zi)*Ratio(j);
         end
         
         % Traverse the ADCP probe along the cross section using the
@@ -222,16 +224,17 @@ for zi = 1:z
             [x1, y1] = line_projection(x1,y1,Offsets(1),0,m);
             [x2, y2] = line_projection(x2,y2,-Offsets(2),0,m);
         end
-        dl2 = hypot((x2-x1),(y2-y1));
+        dl2(zi) = hypot((x2-x1),(y2-y1));
         
         % Compute positional error and display results
-        abs_err = abs(dl2 - nanmax(A(zi).Nav.length));
-        per_err = (abs_err/abs(dl2)) * 100;
-        disp(['   Offset distance is:       ' num2str(dl2)]);
-        disp(['   Probe reported DMG:       ' num2str(dmg{zi})]);
-        disp(['   Probe max length:         ' num2str(nanmax(A(zi).Nav.length))]);
-        disp(['   Absolute error:           ' num2str(abs_err)]);
-        disp(['   Percent error:            ' num2str(per_err)]);
+        abs_err(zi) = abs(dl2(zi) - dmg{zi});
+        per_err(zi) = (abs_err(zi)/abs(dl2(zi))) * 100;
+        probe_length(zi) = nanmax(A(zi).Nav.length);
+%         disp(['   Offset distance is:       ' num2str(dl2(zi))]);
+%         disp(['   Probe reported DMG:       ' num2str(dmg{zi})]);
+%         disp(['   Probe max length:         ' num2str(probe_length(zi))]);
+%         disp(['   Absolute error:           ' num2str(abs_err(zi))]);
+%         disp(['   Percent error:            ' num2str(per_err(zi))]);
         
         % Plot where the ADCP started on the MCS, accounting for offsets
         figure(hf); hold on; plot([x1 x2],[y1 y2],'o');
@@ -329,6 +332,25 @@ for zi = 1:z
        
     clear j origLength Ratio adjLength
 end
+
+% Create table with results
+EndpointDistance = dl';
+DistOffsetApplied = dl2';
+ADCP_DMG = cell2mat(dmg)';
+ADCPLength = probe_length';
+AbsoluteError = abs_err';
+PercentError = per_err';
+
+ResultTable = table(...
+    EndpointDistance,...
+    DistOffsetApplied,...
+    ADCP_DMG,...
+    ADCPLength,...
+    AbsoluteError,...
+    PercentError,...
+    'RowNames',zFileName);
+ResultTable.Properties.VariableUnits = {'m' 'm' 'm' 'm' 'm' 'percent'};
+ResultTable
 
 if Save
     [OUTfile,OUTpath,~] = uiputfile(...
