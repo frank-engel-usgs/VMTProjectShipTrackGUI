@@ -1,4 +1,4 @@
-function A = VMT_ProjectShipTracks(A,Endpoints,Station,Offsets,UTMzone)
+function [A,ResultTable] = VMT_ProjectShipTracks(A,Endpoints,Station,Offsets,UTMzone)
 %THIS function attempts to build the VMT A struct from input WRII ASC files
 %that contain no GPS data. 
 %

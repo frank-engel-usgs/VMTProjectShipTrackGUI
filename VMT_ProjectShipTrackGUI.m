@@ -145,7 +145,15 @@ Endpoints = [x y];
 UTMzone   = utmzone(1,:);
 Offsets   = cell2mat(table_data(:,2:3));
 
-A = VMT_ProjectShipTracks(fullfiles,Endpoints,Station,Offsets,UTMzone);
+[A,Results] = VMT_ProjectShipTracks(fullfiles,Endpoints,Station,Offsets,UTMzone);
+
+% Create a UItable with the error results
+ftbl = figure('name','Computation Results Table'); clf
+th = uitable;
+tname = Results.Properties.VariableNames;
+trow  = Results.Properties.RowNames;
+t = table2cell(Results);
+set(th,'data',t,'ColumnName',tname,'RowName',trow)
 
 % 4. Add the following variables to the workspace:
   z               = length(A); % number of ASCII files in the cross section
