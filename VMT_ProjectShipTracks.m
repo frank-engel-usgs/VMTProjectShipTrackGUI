@@ -358,6 +358,21 @@ if Save
     save(fullfile(OUTpath,OUTfile), 'A')
 end
 
+% % Format the ticks for UTM and allow zooming and panning
+figure(hf)
+xlabel('UTM Easting (m)')
+ylabel('UTM Northing (m)')
+box on; grid on
+set(gca,'DataAspectRatio',[1 1 1],'PlotBoxAspectRatio',[1 1 1])
+set(gca,'TickDir','out')
+ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM
+% hdlzm_fig1 = zoom;
+% set(hdlzm_fig1,'ActionPostCallback',@mypostcallback_zoom);
+% set(hdlzm_fig1,'Enable','on');
+% hdlpn_fig1 = pan;
+% set(hdlpn_fig1,'ActionPostCallback',@mypostcallback_pan);
+% set(hdlpn_fig1,'Enable','on');
+
 
 %%%%%%%%%%%%%%%%
 % SUBFUNCTIONS %
@@ -382,3 +397,9 @@ for i=1:size(X2,2)
         
     end
 end
+
+function mypostcallback_zoom(obj,evd)
+ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM (when zooming) 
+
+function mypostcallback_pan(obj,evd)
+ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM (when panning)

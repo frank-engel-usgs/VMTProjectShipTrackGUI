@@ -148,12 +148,34 @@ Offsets   = cell2mat(table_data(:,2:3));
 [A,Results] = VMT_ProjectShipTracks(fullfiles,Endpoints,Station,Offsets,UTMzone);
 
 % Create a UItable with the error results
-ftbl = figure('name','Computation Results Table'); clf
-th = uitable;
-tname = Results.Properties.VariableNames;
+% See if Table Figure exists already, if so clear the figure
+ftbl = findobj(0,'name','Computation Results Table');
+
+if ~isempty(ftbl) &&  ishandle(ftbl)
+    figure(ftbl); clf
+else
+    ftbl = figure('name','Computation Results Table'); clf
+    %set(gca,'DataAspectRatio',[1 1 1],'PlotBoxAspectRatio',[1 1 1])
+end
+
+fpos = get(ftbl,'Position'); set(ftbl,'Position', [fpos(1:2) 723 420]) 
+th = uitable('Position',[15 60 700 350]);
+tname = {... '%Results.Properties.VariableNames;
+    'Dist between|Endpoints (m)',...
+    'Offset dist|applied (m)',...
+    'ADCP|DMG (m)',...
+    'ADCP|Length (m)',...
+    'Error in|Position (m)',...
+    'Error|%'};
 trow  = Results.Properties.RowNames;
 t = table2cell(Results);
-set(th,'data',t,'ColumnName',tname,'RowName',trow)
+% t = cellfun(@(x) round(x,2),t); % force the table to round to hundreth
+set(th,...
+    'data',t,...
+    'ColumnName',tname,...
+    'RowName',trow,...
+    'ColumnFormat',{'bank' 'bank' 'bank' 'bank' 'bank' 'bank'})
+
 
 % 4. Add the following variables to the workspace:
   z               = length(A); % number of ASCII files in the cross section

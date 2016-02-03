@@ -141,12 +141,12 @@ set(gca,'DataAspectRatio',[1 1 1],'PlotBoxAspectRatio',[1 1 1])
 % % Format the ticks for UTM and allow zooming and panning
 % axes(hf);
 ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM
-% hdlzm_fig1 = zoom;
-% set(hdlzm_fig1,'ActionPostCallback',@mypostcallback_zoom);
-% set(hdlzm_fig1,'Enable','on');
-% hdlpn_fig1 = pan;
-% set(hdlpn_fig1,'ActionPostCallback',@mypostcallback_pan);
-% set(hdlpn_fig1,'Enable','on');
+hdlzm = zoom;
+set(hdlzm,'ActionPostCallback',@mypostcallback_zoom);
+set(hdlzm,'Enable','on');
+hdlpn = pan;
+set(hdlpn,'ActionPostCallback',@mypostcallback_pan);
+set(hdlpn,'Enable','on');
 
 %%%%%%%%%%%%%%%%
 % SUBFUNCTIONS %
