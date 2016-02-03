@@ -208,9 +208,9 @@ start_bank = 'auto';
 % normally by VMT v4. 
   [FileName,PathName,~] = uiputfile(...
        '*.mat','Save processed VMT v4 compliant file as',pwd);
-  save(fullfile(PathName,FileName),'A','V','z','Map')
-
-
+   if ischar(PathName) % The user did not hit "Cancel"
+       save(fullfile(PathName,FileName),'A','V','z','Map')
+   end
 
 
 % --- Executes on button press in SelectFiles.

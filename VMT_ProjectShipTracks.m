@@ -105,19 +105,28 @@ if isempty(Endpoints) || isempty(Station) || isempty(Offsets)
 end
 
 % Loop through each transect and process
-hf = figure('name','ProjectShiptracks'); clf
+% See if Table Figure exists already, if so clear the figure
+hf = findobj(0,'name','Project Shiptracks Plot');
+
+if ~isempty(hf) &&  ishandle(hf)
+    figure(hf); clf
+else
+    hf = figure('name','Project Shiptracks Plot'); clf
+    %set(gca,'DataAspectRatio',[1 1 1],'PlotBoxAspectRatio',[1 1 1])
+end
 set(gca,'DataAspectRatio',[1 1 1])
+co = [0    0.4470    0.7410   % Matlab 2014b+ color order
+    0.8500    0.3250    0.0980
+    0.9290    0.6940    0.1250
+    0.4940    0.1840    0.5560
+    0.4660    0.6740    0.1880
+    0.3010    0.7450    0.9330
+    0.6350    0.0780    0.1840];
+
+% Begin Processing
 for zi = 1:z
     disp(['Transect pass ' num2str(zi)])
-    
-    % If there is GPS data, go ahead and plot it
-    isGPS = any(~isnan(A(zi).Nav.lat_deg));
-    if isGPS
-        [xUTMraw, yUTMraw, utmzone] = deg2utm(...
-            A(zi).Nav.lat_deg,A(zi).Nav.long_deg);
-        plot(xUTMraw,yUTMraw,'b'); hold on
-    end
-    
+           
     % Make a string of station for clarity
     if Station(zi) == 1
         sta{zi} = 'right';
@@ -131,11 +140,20 @@ for zi = 1:z
     dl(zi) = hypot((x2-x1),(y2-y1));
     m = atan((y2-y1)/(x2-x1));
     dmg{zi} = nanmax(A(zi).Nav.dmg);
-    
-%     disp(['   Endpoint distance:        ' num2str(dl(zi))]);
         
     % Plot the line of the mean cross section
-    figure(hf);hold on;plot([x1 x2],[y1 y2],'-'); axis equal
+    if zi == 1
+        figure(hf);hold on;
+        pmcs = plot([x1 x2],[y1 y2],'k-','Linewidth',2);
+    end
+    
+    % If there is GPS data, go ahead and plot it
+    isGPS = any(~isnan(A(zi).Nav.lat_deg));
+    if isGPS
+        [xUTMraw, yUTMraw, utmzone] = deg2utm(...
+            A(zi).Nav.lat_deg,A(zi).Nav.long_deg);
+        gpsshiptrack(zi) = plot(xUTMraw,yUTMraw,'b-'); hold on
+    end
     
     % Overwrite the original endpoints, moving them to where the ADCP probe
     % "started"
@@ -157,15 +175,13 @@ for zi = 1:z
         abs_err(zi) = abs(dl2(zi) - dmg{zi});
         per_err(zi) = (abs_err(zi)/abs(dl2(zi))) * 100;
         probe_length(zi) = nanmax(A(zi).Nav.length);
-%         disp(['   Offset distance is:       ' num2str(dl2(zi))]);
-%         disp(['   Probe reported DMG:       ' num2str(dmg{zi})]);
-%         disp(['   Probe max length:         ' num2str(probe_length(zi))]);
-%         disp(['   Absolute error:           ' num2str(abs_err(zi))]);
-%         disp(['   Percent error:            ' num2str(per_err(zi))]);
         
-        % Plot where the ADCP started on the MCS, accounting for offsets
-        figure(hf); hold on; plot([x1 x2],[y1 y2],'o');
-        text(x1,y1,'LB'); text(x2,y2,'RB'); hold off
+        % Plot where the ADCP started on the MCS for each transect,
+        % accounting for offsets. (Each transect gets it's own color)
+        figure(hf); hold on; 
+        pep(zi) = plot([x1 x2],[y1 y2],'o','Markersize',8);
+        text(x1,y1,'LB','Color', co(zi,:));
+        text(x2,y2,'RB','Color', co(zi,:));
         
         % Scale the DMG to span from the ADCP starting points. This
         % distributes the locational error equally along the transect
@@ -230,15 +246,13 @@ for zi = 1:z
         abs_err(zi) = abs(dl2(zi) - dmg{zi});
         per_err(zi) = (abs_err(zi)/abs(dl2(zi))) * 100;
         probe_length(zi) = nanmax(A(zi).Nav.length);
-%         disp(['   Offset distance is:       ' num2str(dl2(zi))]);
-%         disp(['   Probe reported DMG:       ' num2str(dmg{zi})]);
-%         disp(['   Probe max length:         ' num2str(probe_length(zi))]);
-%         disp(['   Absolute error:           ' num2str(abs_err(zi))]);
-%         disp(['   Percent error:            ' num2str(per_err(zi))]);
         
-        % Plot where the ADCP started on the MCS, accounting for offsets
-        figure(hf); hold on; plot([x1 x2],[y1 y2],'o');
-        text(x1,y1,'LB'); text(x2,y2,'RB'); hold off
+        % Plot where the ADCP started on the MCS for each transect,
+        % accounting for offsets. (Each transect gets it's own color)
+        figure(hf); hold on; 
+        pep(zi) = plot([x1 x2],[y1 y2],'o','Markersize',8);
+        text(x1,y1,'LB','Color', co(zi,:));
+        text(x2,y2,'RB','Color', co(zi,:));
         
         % Scale the DMG to span from the ADCP starting points. This
         % distributes the locational error equally along the transect
@@ -306,8 +320,9 @@ for zi = 1:z
     A(zi).Nav.totDistNorth(bvbt) = -32768;
     
     % Plot the bottom track ensemble locations
-    figure(1); hold on; plot(xUTM,yUTM,'r.'); hold on
-    plot(xUTM(ic),yUTM(ic),'g.')
+    figure(hf); hold on; 
+    %plot(xUTM,yUTM,'r.','Markersize',10);
+    pproj(zi) = plot(xUTM(ic),yUTM(ic),'.','Markersize',15,'Color', co(zi,:));
     
     % Write the result back to A struct as lat/lon and UTM
     A(zi).Nav.xUTM = nan(size(xUTM));
@@ -358,7 +373,8 @@ if Save
     save(fullfile(OUTpath,OUTfile), 'A')
 end
 
-% % Format the ticks for UTM and allow zooming and panning
+
+% Format the ticks for UTM and allow zooming and panning
 figure(hf)
 xlabel('UTM Easting (m)')
 ylabel('UTM Northing (m)')
@@ -372,6 +388,36 @@ ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM
 % hdlpn_fig1 = pan;
 % set(hdlpn_fig1,'ActionPostCallback',@mypostcallback_pan);
 % set(hdlpn_fig1,'Enable','on');
+
+% Build a legend
+figure(hf)
+if exist('gpsshiptrack','var')
+    phandles = [...
+        pmcs...
+        gpsshiptrack(1)...
+        pep...
+        pproj];
+    legstr = {'Cross-Section','GPS shiptracks'};
+    j=1;
+    for i = 3:3+numel(pep)-1
+        legstr(i)   = {['XS ' num2str(j) ' Start/Stop']};
+        legstr(i+z) = {['XS ' num2str(j) ' Proj. Ens.']};
+        j=j+1;
+    end
+else
+    phandles = [...
+        pmcs...
+        pep...
+        pproj];
+    legstr = {'Cross-Section','GPS shiptracks'};
+    j=1;
+    for i = 2:2+numel(pep)-1
+        legstr(i)   = {['XS ' num2str(j) ' Start/Stop']};
+        legstr(i+z) = {['XS ' num2str(j) ' Proj. Ens.']};
+        j=j+1;
+    end
+end
+lh = legend(phandles,legstr);
 
 
 %%%%%%%%%%%%%%%%
