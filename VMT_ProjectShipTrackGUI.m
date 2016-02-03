@@ -22,9 +22,11 @@ function varargout = VMT_ProjectShipTrackGUI(varargin)
 
 % Edit the above text to modify the response to help VMT_ProjectShipTrackGUI
 
-% Last Modified by GUIDE v2.5 28-Jan-2016 14:22:29
+% Last Modified by GUIDE v2.5 03-Feb-2016 13:46:30
 
 % Begin initialization code - DO NOT EDIT
+% Adress 2015b java bug #1293244
+javax.swing.UIManager.setLookAndFeel('com.sun.java.swing.plaf.windows.WindowsLookAndFeel')
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
                    'gui_Singleton',  gui_Singleton, ...
@@ -109,6 +111,28 @@ function varargout = VMT_ProjectShipTrackGUI_OutputFcn(hObject, eventdata, handl
 
 % Get default command line output from handles structure
 varargout{1} = handles.output;
+
+
+% --- Executes when user attempts to close figure1.
+function figure1_CloseRequestFcn(hObject, eventdata, handles)
+% hObject    handle to figure1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: delete(hObject) closes the figure
+who_called = get(hObject,'tag');
+close_button = questdlg(...
+    'You are about to exit the VMT Project Shiptrack Tool. Any unsaved work will be lost. Are you sure?',...
+    'Exit VMT?','No');
+switch close_button
+    case 'Yes'
+        closereq
+        close all hidden
+    otherwise
+        return
+end
+% [EOF] figure1_CloseRequestFcn
+
 
 
 % --- Executes on button press in ProcessTransect.
@@ -519,9 +543,4 @@ guiparams.table_data = table_data;
 
 % Store result
 setappdata(handles.figure1,'guiparams',guiparams)
-
-        
-
-
-
-
+     
