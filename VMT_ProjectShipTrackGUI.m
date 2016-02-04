@@ -71,6 +71,7 @@ end
 guidata(hObject, handles);
 
 % Create GUI Parameters
+guiparams.version = {'v1.00'; 'r20160204'};
 guiparams.horizontal_smoothing_window   = 1;
 guiparams.vertical_smoothing_window     = 1;
 guiparams.water_surface_elevation       = 0;
@@ -95,6 +96,73 @@ guiparams.left_latitude_dd              = [];
 guiparams.left_longitude_dd             = [];
 guiparams.right_latitude_dd             = [];
 guiparams.right_latitude_dd             = [];
+guiparams.prefgroup                     = 'VMTProjectShiptrackTool';
+
+% Set version name on GUI
+set(handles.figure1,'Name',['VMT: Project Shiptrack Tool ' guiparams.version{1}], ...
+    'DockControls','off')
+
+% Create and/or load persistent preferences
+prefgroup = guiparams.prefgroup;
+
+% Location of last saved Excel File List Table
+if ispref(prefgroup,'filetable')
+    filetable = getpref(prefgroup,'filetable');
+    if exist(filetable.path,'dir')
+        guiprefs.filetable_path = filetable.path;
+    else
+        guiprefs.filetable_path = pwd;
+    end
+    if exist(fullfile(filetable.path,filetable.file),'file')
+        guiprefs.filetable_file = filetable.file;
+    else
+        guiprefs.filetable_file = '';
+    end
+else % Initialize Pref
+    guiprefs.filetable_path = pwd;
+    guiprefs.filetable_file = '';
+    
+    filetable.path = pwd;
+    filetable.file = '';
+    setpref(prefgroup,'filetable',filetable)
+end
+
+% Location of last ASCII file directory
+if ispref(prefgroup,'asciidir')
+    asciidir = getpref(prefgroup,'asciidir');
+    if exist(asciidir.path,'dir')
+        guiprefs.asciidir_path = asciidir.path;
+    else
+        guiprefs.asciidir_path = pwd;
+    end
+else % Initialize Pref
+    guiprefs.asciidir_path = pwd;
+    asciidir.path = pwd;
+    setpref(prefgroup,'asciidir',asciidir)
+end
+
+% Location of last Save Directory and File(Where to save the VMT MAT-file)
+if ispref(prefgroup,'vmtmatdir')
+    vmtmatdir = getpref(prefgroup,'vmtmatdir');
+    if exist(vmtmatdir.path,'dir')
+        guiprefs.vmtmatdir_path = vmtmatdir.path;
+    else
+        guiprefs.vmtmatdir_path = pwd;
+    end
+    if exist(fullfile(vmtmatdir.path,vmtmatdir.file),'file')
+        guiprefs.vmtmatdir_file = vmtmatdir.file;
+    else
+        guiprefs.vmtmatdir_file = '';
+    end
+else % Initialize Pref
+    guiprefs.vmtmatdir_path = pwd;
+    guiprefs.vmtmatdir_file = '';
+    
+    vmtmatdir.path = pwd;
+    vmtmatdir.file = '';
+    setpref(prefgroup,'vmtmatdir',vmtmatdir)
+end
+
 
 % Store the appication data
 setappdata(handles.figure1,'guiparams',guiparams)
@@ -123,7 +191,7 @@ function figure1_CloseRequestFcn(hObject, eventdata, handles)
 who_called = get(hObject,'tag');
 close_button = questdlg(...
     'You are about to exit the VMT Project Shiptrack Tool. Any unsaved work will be lost. Are you sure?',...
-    'Exit VMT?','No');
+    'Exit VMT Project Shiptrack Tool?','No');
 switch close_button
     case 'Yes'
         closereq
@@ -143,11 +211,14 @@ function ProcessTransect_Callback(hObject, eventdata, handles)
 % Get the Application data:
 % -------------------------
 guiparams = getappdata(handles.figure1,'guiparams');
-mcs_id = guiparams.mcs_id;
+vmtmatdir  = getpref(guiparams.prefgroup,'vmtmatdir');
+
+% Assign inputs to local variables for clarity
+mcs_id                       = guiparams.mcs_id;
 horizontal_grid_node_spacing = guiparams.horizontal_grid_node_spacing;
-vertical_grid_node_spacing = guiparams.vertical_grid_node_spacing;
-data_folder = guiparams.data_folder;
-data_files = guiparams.data_files;
+vertical_grid_node_spacing   = guiparams.vertical_grid_node_spacing;
+data_folder                  = guiparams.data_folder;
+data_files                   = guiparams.data_files;
 fullfiles = {};
 for i = 1:numel(data_files)
     fullfiles(i) = {fullfile(data_folder,data_files{i})};
@@ -158,30 +229,29 @@ Lat = [guiparams.left_latitude_dd guiparams.right_latitude_dd];
 Lon = [guiparams.left_longitude_dd guiparams.right_longitude_dd];
 %zt      = unique(mcs_id);
 
-% Massage inputs for processing function call
+% Massage inputs for processing engine
 Station = table_data(:,4)';
 Station(strcmpi('L',Station)) = {0};
 Station(strcmpi('R',Station)) = {1};
 Station = cell2mat(Station);
 
+% Construct coordinates for processing engine
 [x,y,utmzone] = deg2utm(Lat,Lon);
 Endpoints = [x y];
 UTMzone   = utmzone(1,:);
 Offsets   = cell2mat(table_data(:,2:3));
 
+% Run processing engine
 [A,Results] = VMT_ProjectShipTracks(fullfiles,Endpoints,Station,Offsets,UTMzone);
 
-% Create a UItable with the error results
+% Create a UItable with the error results, and display in a figure
 % See if Table Figure exists already, if so clear the figure
 ftbl = findobj(0,'name','Computation Results Table');
-
 if ~isempty(ftbl) &&  ishandle(ftbl)
     figure(ftbl); clf
 else
     ftbl = figure('name','Computation Results Table'); clf
-    %set(gca,'DataAspectRatio',[1 1 1],'PlotBoxAspectRatio',[1 1 1])
 end
-
 fpos = get(ftbl,'Position'); set(ftbl,'Position', [fpos(1:2) 723 420]) 
 th = uitable('Position',[15 60 700 350]);
 tname = {... '%Results.Properties.VariableNames;
@@ -201,40 +271,50 @@ set(th,...
     'ColumnFormat',{'bank' 'bank' 'bank' 'bank' 'bank' 'bank'})
 
 
-% 4. Add the following variables to the workspace:
-  z               = length(A); % number of ASCII files in the cross section
-  setends         = 0;         % turn off manual enpoint control 
-  unitQcorrection = 0;         % turn off Hoitink correction
-  A(1).hgns       = 1;         % Horizontal Grid node spacing in meters
-  A(1).vgns       = 0.4;       % Vertical Grid node spacing in meters
-  A(1).wse        = 0;         % water surface elev in meters
-  Map             = [];        % this would indicate if there was a saved
-                               % Map file loaded. Set to empty matrix. 
- 
- % Adjust vertical grid size by bin size
- if A(1).Sup.wm ~= 3 % RG
-%      set(handles.VerticalGridNodeSpacing,'String',double(A(1).Sup.binSize_cm(1))/100)
-     guiparams.vertical_grid_node_spacing = double(A(1).Sup.binSize_cm(1))/100;
- else % Older file, must be RR or M9
-%      set(handles.VerticalGridNodeSpacing,'String',0.4)
-     guiparams.vertical_grid_node_spacing = 0.4;
- end
- 
-%%
-% Run the PreProcessing Engine
-  A = VMT_PreProcess(z,A);
+% Take Processing engine results and run them through VMT to save a
+% MAT-file
+z               = length(A); % number of ASCII files in the cross section
+setends         = 0;         % turn off manual enpoint control
+unitQcorrection = 0;         % turn off Hoitink correction
+A(1).hgns       = 1;         % Horizontal Grid node spacing in meters
+A(1).vgns       = 0.4;       % Vertical Grid node spacing in meters
+A(1).wse        = 0;         % water surface elev in meters
+Map             = [];        % this would indicate if there was a saved
+                             % Map file loaded. Set to empty matrix.
 
-% Run the Processing Engine
+                             
+% Adjust vertical grid size by bin size
+if A(1).Sup.wm ~= 3 % RG
+    guiparams.vertical_grid_node_spacing = double(A(1).Sup.binSize_cm(1))/100;
+else % Older file, must be RR or M9
+    
+    guiparams.vertical_grid_node_spacing = 0.4;
+end
+
+% PASS VMT_ProjectShiptTracks results to VMT Processing Engine
+% Run the VMT PreProcessing Engine
+A = VMT_PreProcess(z,A);
+
+% Run the VMT Processing Engine
 start_bank = 'auto';
-  [A,V,log_text] = VMT_ProcessTransects(z,A,setends,unitQcorrection,start_bank);
- 
+[A,V,log_text] = VMT_ProcessTransects(z,A,setends,unitQcorrection,start_bank);
+
 % Save the workspace as a MAT file. This MAT file can be processed
-% normally by VMT v4. 
-  [FileName,PathName,~] = uiputfile(...
-       '*.mat','Save processed VMT v4 compliant file as',pwd);
-   if ischar(PathName) % The user did not hit "Cancel"
-       save(fullfile(PathName,FileName),'A','V','z','Map')
-   end
+% normally by VMT v4.
+current_file = fullfile(vmtmatdir.path,vmtmatdir.file);
+[FileName,PathName,~] = uiputfile(...
+    '*.mat','Save processed VMT v4 compliant file as',current_file);
+if ischar(PathName) % The user did not hit "Cancel"
+    save(fullfile(PathName,FileName),'A','V','z','Map')
+    
+    % Save the preference change
+    vmtmatdir.path = PathName;
+    vmtmatdir.file = FileName;
+    setpref(guiparams.prefgroup,'vmtmatdir',vmtmatdir);
+end
+% Save the application data
+setappdata(handles.figure1,'guiparams',guiparams)
+
 
 
 % --- Executes on button press in SelectFiles.
@@ -245,11 +325,11 @@ function SelectFiles_Callback(hObject, eventdata, handles)
 % Get the Application data:
 % -------------------------
 guiparams = getappdata(handles.figure1,'guiparams');
-% guiprefs = getappdata(handles.figure1,'guiprefs');
+asciidir  = getpref(guiparams.prefgroup,'asciidir');
 
 % Ask the user to select files:
 % -----------------------------
-current_file = pwd; %fullfile(guiprefs.ascii_path,guiprefs.ascii_file{1});
+current_file = asciidir.path;
 [filename,pathname] = uigetfile({'*_ASC.TXT','ASCII (*_ASC.TXT)'}, ...
     'Select the ASCII Output Files', ...
     current_file, ...
@@ -257,45 +337,36 @@ current_file = pwd; %fullfile(guiprefs.ascii_path,guiprefs.ascii_file{1});
 
 if ischar(pathname) % The user did not hit "Cancel"
     guiparams.data_folder = pathname;
+    asciidir.path = pathname;
     if ischar(filename)
         filename = {filename};
     end
     guiparams.data_files = filename;
-%     guiparams.mat_file = '';
     
     setappdata(handles.figure1,'guiparams',guiparams)
     
-% Populate the table
-% Ensure UItable is empty before filling it with current selection
-ClearTable_Callback(hObject, eventdata, handles)
-
-% set(handles.FileList,'data',single.empty(500,2,0));
-
-% Construct table
-numXS = length(filename);
-emptytable = {[] [] []};
-table_data = [filename' repmat(emptytable,numXS,1)];
-guiparams.mcs_id = num2cell(ones(numel(filename),1));
-
-% Push it to the UItable
-set(handles.FileList,'data',table_data);
-
-% Store parameters
-guiparams.table_data = table_data;
-setappdata(handles.figure1,'guiparams',guiparams)
-
-
-%     % Update the preferences:
-%     % -----------------------
-%     guiprefs = getappdata(handles.figure1,'guiprefs');
-%     guiprefs.ascii_path = pathname;
-%     guiprefs.ascii_file = filename;
-%     setappdata(handles.figure1,'guiprefs',guiprefs)
-%     store_prefs(handles.figure1,'ascii')
+    % Populate the table
+    % Ensure UItable is empty before filling it with current selection
+    ClearTable_Callback(hObject, eventdata, handles)
+    
+    % set(handles.FileList,'data',single.empty(500,2,0));
+    
+    % Construct table
+    numXS = length(filename);
+    emptytable = {[] [] []};
+    table_data = [filename' repmat(emptytable,numXS,1)];
+    guiparams.mcs_id = num2cell(ones(numel(filename),1));
+    
+    % Push it to the UItable
+    set(handles.FileList,'data',table_data);
+    
+    % Store parameters
+    guiparams.table_data = table_data;
     
 end
-
-
+% Save the application data
+setappdata(handles.figure1,'guiparams',guiparams)
+setpref(guiparams.prefgroup,'asciidir',asciidir);
 
 
 % --- Executes on button press in LoadTable.
@@ -306,36 +377,45 @@ function LoadTable_Callback(hObject, eventdata, handles)
 
 % Get application data
 guiparams = getappdata(handles.figure1,'guiparams');
+filetable  = getpref(guiparams.prefgroup,'filetable');
 
-[filename,pathname] = uigetfile('*.xlsx','Load Batch File',guiparams.data_folder);
-[ndata, text, alldata] = xlsread(fullfile(pathname,filename));
-tabledata = alldata(8:end,1:4);
-left_latitude_dms   = alldata{4,2};
-left_longitude_dms  = alldata{5,2};
-right_latitude_dms  = alldata{4,3};
-right_longitude_dms = alldata{5,3};
+% Load the XLS
+[filename,pathname] = uigetfile('*.xlsx','Load Batch File',fullfile(filetable.path,filetable.file));
+if ischar(pathname) % The user did not hit "Cancel"
+    filetable.path = pathname;
+    filetable.file = filename;
+    [ndata, text, alldata] = xlsread(fullfile(pathname,filename));
+    tabledata = alldata(8:end,1:4);
+    left_latitude_dms   = alldata{4,2};
+    left_longitude_dms  = alldata{5,2};
+    right_latitude_dms  = alldata{4,3};
+    right_longitude_dms = alldata{5,3};
+    
+    % Populate the GUI
+    set(handles.LeftLatitude,   'String', left_latitude_dms)
+    set(handles.LeftLongitude,  'String', left_longitude_dms)
+    set(handles.RightLatitude,  'String', right_latitude_dms)
+    set(handles.RightLongitude, 'String', right_longitude_dms)
+    set(handles.FileList,'data',tabledata);
+    
+    % Store results
+    guiparams.data_folder         = alldata{1,2};
+    guiparams.data_files          = tabledata(:,1);
+    guiparams.table_data          = get(handles.FileList,'data');
+    guiparams.left_latitude_dms   = left_latitude_dms;
+    guiparams.left_longitude_dms  = left_longitude_dms;
+    guiparams.right_latitude_dms  = right_latitude_dms;
+    guiparams.right_longitude_dms = right_longitude_dms;
+    guiparams.left_latitude_dd    = dms2dd(cellfun(@str2num,strsplit(left_latitude_dms)));
+    guiparams.left_longitude_dd   = dms2dd(cellfun(@str2num,strsplit(left_longitude_dms)));
+    guiparams.right_latitude_dd   = dms2dd(cellfun(@str2num,strsplit(right_latitude_dms)));
+    guiparams.right_longitude_dd  = dms2dd(cellfun(@str2num,strsplit(right_longitude_dms)));
+end
 
-set(handles.LeftLatitude,   'String', left_latitude_dms)
-set(handles.LeftLongitude,  'String', left_longitude_dms)
-set(handles.RightLatitude,  'String', right_latitude_dms)
-set(handles.RightLongitude, 'String', right_longitude_dms)
-set(handles.FileList,'data',tabledata);
-
-
-guiparams.data_folder         = alldata{1,2};
-guiparams.data_files          = tabledata(:,1);
-guiparams.table_data          = get(handles.FileList,'data');
-guiparams.left_latitude_dms   = left_latitude_dms;
-guiparams.left_longitude_dms  = left_longitude_dms;
-guiparams.right_latitude_dms  = right_latitude_dms;
-guiparams.right_longitude_dms = right_longitude_dms;
-guiparams.left_latitude_dd    = dms2dd(cellfun(@str2num,strsplit(left_latitude_dms)));
-guiparams.left_longitude_dd   = dms2dd(cellfun(@str2num,strsplit(left_longitude_dms)));
-guiparams.right_latitude_dd   = dms2dd(cellfun(@str2num,strsplit(right_latitude_dms)));
-guiparams.right_longitude_dd  = dms2dd(cellfun(@str2num,strsplit(right_longitude_dms)));
-
-
+% Save application data
 setappdata(handles.figure1,'guiparams',guiparams)
+setpref(guiparams.prefgroup,'filetable',filetable);
+
 
 
 
@@ -347,25 +427,32 @@ function SaveTable_Callback(hObject, eventdata, handles)
 
 % Get application data
 guiparams = getappdata(handles.figure1,'guiparams');
+filetable  = getpref(guiparams.prefgroup,'filetable');
 
 % Get whatever is in the UItable
 data = get(handles.FileList,'data');
 numXS = size(data,1);
 
 % Write to an Excel File
-[filename,pathname] = uiputfile('*.xlsx','Save Batch File As',guiparams.data_folder);
-data = [...
-    {'Data Path:'         guiparams.data_folder       []                             []};...
-    cell(1,4);...
-    {[]                   'Left Endpoint'             'Right Endpoint'               []};...
-    {'Latitude:'          guiparams.left_latitude_dms  guiparams.right_latitude_dms  '(+/-dd mm ss.sss)'};...
-    {'Longitude:'         guiparams.left_longitude_dms guiparams.right_longitude_dms '(+/-ddd mm ss.sss)'};...
-    cell(1,4);...
-    {'ASCII File Name(s)' 'Left Offset (m)'            'Right Offset (m)'            'Start Station (L/R)'};...
-    data];
-xlswrite(fullfile(pathname,filename),data);
-
-
+current_file = fullfile(filetable.path,filetable.file);
+[filename,pathname] = uiputfile('*.xlsx','Save Batch File As',current_file);
+if ischar(pathname) % The user did not hit "Cancel"
+    filetable.path = pathname;
+    filetable.file = filename;
+    data = [...
+        {'Data Path:'         guiparams.data_folder       []                             []};...
+        cell(1,4);...
+        {[]                   'Left Endpoint'             'Right Endpoint'               []};...
+        {'Latitude:'          guiparams.left_latitude_dms  guiparams.right_latitude_dms  '(+/-dd mm ss.sss)'};...
+        {'Longitude:'         guiparams.left_longitude_dms guiparams.right_longitude_dms '(+/-ddd mm ss.sss)'};...
+        cell(1,4);...
+        {'ASCII File Name(s)' 'Left Offset (m)'            'Right Offset (m)'            'Start Station (L/R)'};...
+        data];
+    xlswrite(fullfile(pathname,filename),data);
+end
+% Save application data
+setappdata(handles.figure1,'guiparams',guiparams)
+setpref(guiparams.prefgroup,'filetable',filetable);
 
 
 % --- Executes on button press in ClearTable.
