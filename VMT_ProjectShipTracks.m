@@ -1,6 +1,9 @@
 function [A,ResultTable] = VMT_ProjectShipTracks(A,Endpoints,Station,Offsets,UTMzone)
-%THIS function attempts to build the VMT A struct from input WRII ASC files
+%VMT_PROJECTSHIPTRACKS function attempts to build the VMT A struct from input WRII ASC files
 %that contain no GPS data. 
+% 
+% VMT_PROJECTSHIPTRACKS can be run stand-alone, or from the Project Ship
+% Track Tool GUI (preffered method). 
 %
 % To locate the position of each measured ensemble within a transect, a
 % method based on ADCP bottom track data that accounts for positional
@@ -25,7 +28,7 @@ function [A,ResultTable] = VMT_ProjectShipTracks(A,Endpoints,Station,Offsets,UTM
 % 
 % Data formats are as follows: 
 %   Station = [0 1 0 1];                        0 = Channel left, 
-%                                                   1 = Channel right
+%                                               1 = Channel right
 %   Endpoints = [314381.119 4467822.594;...     [X1 Y1; X2 Y2] in UTM (m)
 %       314353.275 4467819.957]; 
 %   Offsets = [1.4 4.5];                        [LB RB] in meters
@@ -37,32 +40,44 @@ function [A,ResultTable] = VMT_ProjectShipTracks(A,Endpoints,Station,Offsets,UTM
 % cross section, and a MAT file containing the cross section STATION,
 % ENDPOINTS, OFFSETS, and UTMZONE variables for that cross section.
 % 
-% If sucessfull, the function should produce a plot (Figure 1) of the cross
-% section line, bank stationing, and projected ensemble locations. Green
-% ensemble locations are good, whereas red are repeat locations where the
-% function has not included them in the resulting A struct. VMT has
-% algorithms to replace these missing ensemble locations with interpolated
-% valid bottom track.
+% If sucessfull, the function should produce a plot of the cross section
+% line, bank stationing, and projected ensemble locations. 
 % 
 % Created by: Frank L. Engel (fengel@usgs.gov)
-% Last modified: 2014/02/03 (FLE, added comments, descriptions for Ricardo)
+% Modifications: 
+%       2014/02/03 FLE -added comments, descriptions for Ricardo
+%       2015/02/04 FLE -added ability to plot GPS data, if available, for
+%                       comparison.
+%                      -moved text-based error analysis into a table object
+%                       and associated figure
+%                      -changed the plot: added legend, revised colors
+%                      -various other minor changes to integrate into GUI
+%                       tool produced for SFWMD
+% 
+% DEPENDENCIES:
+%   Statistics and Machine Learning Toolbox
+%   deg2utm, nansum, tfile, ticks_format, utm2deg
+% 
+% BEGIN CODE
 
-% Set to 1 to save A structures automatically
-Save = 0;
+% Set to TRUE to save A structures automatically
+% This is disabled now, as the GUI handles the final steps of processing
+% and saving the VMT MAT-File. 
+Save = false;
 
 % Check to see if A was given, prompt user to load ASC files if needed.
 % Read in the ASCII data, and make an A struct.
 if isempty(A)
     zPathName = uigetdir(pwd,'Select folder containing WR ASCII data');
-    Files = dir(zPathName);
-    allFiles = {Files.name};
-    filefind=strfind(allFiles,'ASC.TXT')';
-    filesidx=nan(size(filefind,1),1);
+    Files     = dir(zPathName);
+    allFiles  = {Files.name};
+    filefind  = strfind(allFiles,'ASC.TXT')';
+    filesidx  = nan(size(filefind,1),1);
     for i=1:size(filefind,1)
         filesidx(i,1)=size(filefind{i},1);
     end
-    filesidx=find(filesidx>0);
-    files=allFiles(filesidx);
+    filesidx = find(filesidx>0);
+    files    = allFiles(filesidx);
     
     % Allow user to select which files are to be processed
     selection = listdlg('ListSize',[500 300],'ListString', files,...
@@ -80,7 +95,7 @@ if isempty(A)
     
     for zi = 1:z
         fullName = fullfile(zPathName,zFileName{zi});
-        [A(zi)] = tfile(fullName,1,0);
+        [A(zi)]  = tfile(fullName,1,0);
         disp(['ASCII File: ' fullName])
     end
 else % Arguement 1 is a cell of full paths to ASC files
@@ -90,7 +105,7 @@ else % Arguement 1 is a cell of full paths to ASC files
     for zi = 1:z
         fullName = files2load{zi};
         [zPathName{zi},zFileName{zi},zExt{zi}] = fileparts(fullName); 
-        [A(zi)] = tfile(fullName,1,0);
+        [A(zi)]  = tfile(fullName,1,0);
         disp(['ASCII File: ' fullName])
     end
     
@@ -104,15 +119,12 @@ if isempty(Endpoints) || isempty(Station) || isempty(Offsets)
     disp(['Offset File: ' fullfile(INpath,INfile)])
 end
 
-% Loop through each transect and process
 % See if Table Figure exists already, if so clear the figure
 hf = findobj(0,'name','Project Shiptracks Plot');
-
 if ~isempty(hf) &&  ishandle(hf)
     figure(hf); clf
 else
     hf = figure('name','Project Shiptracks Plot'); clf
-    %set(gca,'DataAspectRatio',[1 1 1],'PlotBoxAspectRatio',[1 1 1])
 end
 set(gca,'DataAspectRatio',[1 1 1])
 co = [0    0.4470    0.7410   % Matlab 2014b+ color order
@@ -124,6 +136,7 @@ co = [0    0.4470    0.7410   % Matlab 2014b+ color order
     0.6350    0.0780    0.1840];
 
 % Begin Processing
+% Loop through each transect and process
 for zi = 1:z
     disp(['Transect pass ' num2str(zi)])
            
@@ -137,8 +150,8 @@ for zi = 1:z
     % Compute dx, dy, dl, & m of the line, always going from LB to RB
     x1 = Endpoints(1,1); x2 = Endpoints(2,1);
     y1 = Endpoints(1,2); y2 = Endpoints(2,2);
-    dl(zi) = hypot((x2-x1),(y2-y1));
-    m = atan((y2-y1)/(x2-x1));
+    dl(zi)  = hypot((x2-x1),(y2-y1));
+    m       = atan((y2-y1)/(x2-x1));
     dmg{zi} = nanmax(A(zi).Nav.dmg);
         
     % Plot the line of the mean cross section
@@ -156,7 +169,8 @@ for zi = 1:z
     end
     
     % Overwrite the original endpoints, moving them to where the ADCP probe
-    % "started"
+    % "started". The order of operations depends on whether the left bank
+    % is East or West of the right bank.
     if x1>x2 % left bank is east of right bank
         if strcmpi(sta{zi},'left')
             % Start from LB, subtract offset, find point on line where ADCP
@@ -171,7 +185,7 @@ for zi = 1:z
         end
         dl2(zi) = hypot((x2-x1),(y2-y1));
         
-        % Compute positional error and display results
+        % Compute positional error
         abs_err(zi) = abs(dl2(zi) - dmg{zi});
         per_err(zi) = (abs_err(zi)/abs(dl2(zi))) * 100;
         probe_length(zi) = nanmax(A(zi).Nav.length);
@@ -242,7 +256,7 @@ for zi = 1:z
         end
         dl2(zi) = hypot((x2-x1),(y2-y1));
         
-        % Compute positional error and display results
+        % Compute positional error
         abs_err(zi) = abs(dl2(zi) - dmg{zi});
         per_err(zi) = (abs_err(zi)/abs(dl2(zi))) * 100;
         probe_length(zi) = nanmax(A(zi).Nav.length);
@@ -321,20 +335,17 @@ for zi = 1:z
     
     % Plot the bottom track ensemble locations
     figure(hf); hold on; 
-    %plot(xUTM,yUTM,'r.','Markersize',10);
     pproj(zi) = plot(xUTM(ic),yUTM(ic),'.','Markersize',15,'Color', co(zi,:));
     
     % Write the result back to A struct as lat/lon and UTM
-    A(zi).Nav.xUTM = nan(size(xUTM));
-    A(zi).Nav.yUTM = nan(size(yUTM));
+    A(zi).Nav.xUTM     = nan(size(xUTM));
+    A(zi).Nav.yUTM     = nan(size(yUTM));
     A(zi).Nav.xUTM(ic) = xUTM(ic);
     A(zi).Nav.yUTM(ic) = yUTM(ic);
-    utmz = repmat(UTMzone,size(xUTM));
+    utmz               = repmat(UTMzone,size(xUTM));
     [...
         A(zi).Nav.lat_deg,...
         A(zi).Nav.long_deg] = utm2deg(xUTM',yUTM',utmz);
-    clear utmz
-    
     
     % Ensure that the screening of bad data worked
     badidx = -32768;
@@ -342,19 +353,18 @@ for zi = 1:z
     A(zi).Nav.bvEast(A(zi).Nav.bvEast==badidx)   = nan;
     A(zi).Nav.bvError(A(zi).Nav.bvError==badidx) = nan;
     A(zi).Nav.bvNorth(A(zi).Nav.bvNorth==badidx) = nan;
-    
-    
-       
-    clear j origLength Ratio adjLength
+        
+    % Clean up for next transect   
+    clear j origLength Ratio adjLength utmz
 end
 
-% Create table with results
-EndpointDistance = dl';
+% Create table with the error estimation results
+EndpointDistance  = dl';
 DistOffsetApplied = dl2';
-ADCP_DMG = cell2mat(dmg)';
-ADCPLength = probe_length';
-AbsoluteError = abs_err';
-PercentError = per_err';
+ADCP_DMG          = cell2mat(dmg)';
+ADCPLength        = probe_length';
+AbsoluteError     = abs_err';
+PercentError      = per_err';
 
 ResultTable = table(...
     EndpointDistance,...
@@ -365,7 +375,7 @@ ResultTable = table(...
     PercentError,...
     'RowNames',zFileName);
 ResultTable.Properties.VariableUnits = {'m' 'm' 'm' 'm' 'm' 'percent'};
-ResultTable
+ResultTable % Dumps the text of the table to the CMD
 
 if Save
     [OUTfile,OUTpath,~] = uiputfile(...
@@ -391,7 +401,7 @@ ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM
 
 % Build a legend
 figure(hf)
-if exist('gpsshiptrack','var')
+if exist('gpsshiptrack','var') % If there are GPS data, put it in the legend
     phandles = [...
         pmcs...
         gpsshiptrack(1)...
@@ -404,7 +414,7 @@ if exist('gpsshiptrack','var')
         legstr(i+z) = {['XS ' num2str(j) ' Proj. Ens.']};
         j=j+1;
     end
-else
+else % No GPS data for legend
     phandles = [...
         pmcs...
         pep...
@@ -424,7 +434,7 @@ lh = legend(phandles,legstr);
 % SUBFUNCTIONS %
 %%%%%%%%%%%%%%%%
 function [rx, ry] = line_projection(X1,Y1,X2,Y2,phi)
-% Project a line onto a given coordinate system
+% Project a line onto a given coordinate system (2-D)
 
 % Rotation matrix
 Rz = [cos(phi) -sin(phi);...
@@ -445,7 +455,9 @@ for i=1:size(X2,2)
 end
 
 function mypostcallback_zoom(obj,evd)
-ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM (when zooming) 
+%formats the ticks for UTM (when zooming) 
+ticks_format('%6.0f','%8.0f'); 
 
 function mypostcallback_pan(obj,evd)
-ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM (when panning)
+%formats the ticks for UTM (when panning)
+ticks_format('%6.0f','%8.0f'); 
