@@ -52,24 +52,55 @@ else
 end
 
 catch err
-    if isdeployed
-        errLogFileName = fullfile(pwd,...
-            ['errorLog' datestr(now,'yyyymmddHHMMSS') '.txt']);
-        msgbox({['An unexpected error occurred. Error code: ' err.identifier];...
-            ['Error details are being written to the following file: '];...
-            errLogFileName},...
-            'VMT Status: Unexpected Error',...
-            'error');
-        fid = fopen(errLogFileName,'W');
-        fwrite(fid,err.getReport('extended','hyperlinks','off'));
-        fclose(fid);
-        rethrow(err)
-    else
-        msgbox(['An unexpected error occurred. Error code: ' err.identifier],...
-            'VMT Status: Unexpected Error',...
-            'error');
-        rethrow(err);
+    errdir = getenv('USERPROFILE');
+    errLogFileName = fullfile(errdir,...
+        ['VMTerrorLog.txt']);
+    errWorkspace = fullfile(errdir,...
+        ['VMTerrorWorkspace.mat']);
+    msgbox({['An unexpected error occurred. Error code: ' err.identifier];...
+        '';...
+        'Error details are being written to the following file: ';...
+        errLogFileName;...
+        '';...
+        'Attempting to save current workspace to:';...
+        errWorkspace},...
+        'VMT Status: Unexpected Error',...
+        'error');
+    handles = varargin{end};
+    guiprefs  = getappdata(handles.figure1,'guiprefs');
+    guiparams = getappdata(handles.figure1,'guiparams');
+    
+    i=1;
+    texterr{i} = 'VMT version:';
+    i=i+1;
+    texterr{i} = guiparams.vmt_version{1};
+    i=i+1;
+    texterr{i} = guiparams.vmt_version{2};
+    i=i+1;
+    texterr{i} = ['Date and time of error: ' datestr(now)];
+    i=i+1;
+    texterr{i} = '';
+    i=i+1;
+    texterr{i} = 'Attempting to save current workspace to:';
+    i=i+1;
+    texterr{i} = ['    ' errWorkspace];
+    i=i+1;
+    texterr{i} = '';
+    i=i+1;
+    texterr{i} = 'Error messages:';
+    i=i+1;
+    texterr{i} = err.getReport('extended','hyperlinks','off');
+    
+    fid = fopen(errLogFileName,'W');
+    fprintf(fid,'%s\r\n',texterr{:});
+    fclose(fid);
+    
+    % Try to save a matfile with guiparams and guiprefs
+    try
+        save(errWorkspace,'guiparams','guiprefs','-mat')
+    catch err
     end
+    rethrow(err)
 end
 % End initialization code - DO NOT EDIT
 
@@ -110,7 +141,7 @@ load_prefs(handles.figure1)
 % Initialize the GUI parameters:
 % ------------------------------
 guiparams = createGUIparams;
-guiparams.vmt_version = {'v4.08'; 'r20160121'};
+guiparams.vmt_version = {'v4.09'; 'r20171208'};
 
 % Draw the VMT Background
 % -----------------
@@ -230,8 +261,84 @@ loadDataCallback(hObject, eventdata, handles)
 % [EOF] menuOpenASCII_Callback
 
 % --------------------------------------------------------------------
+function menuOpenSonTekMAT_Callback(hObject, eventdata, handles)
+axes(findobj(handles.figure1,'Tag','Plot1Shiptracks')); cla
+closeOpenFigures(hObject, eventdata, handles)
+% Get the Application data:
+% -------------------------
+guiparams = getappdata(handles.figure1,'guiparams');
+guiprefs = getappdata(handles.figure1,'guiprefs');
+
+% Ask the user to select files:
+% -----------------------------
+% current_file = fullfile(guiparams.data_folder,guiparams.data_files{1});
+% current_file = fullfile(guiprefs.mat_path,guiprefs.mat_file);
+if iscell(guiprefs.mat_file)
+    uifile = fullfile(guiprefs.mat_path,guiprefs.mat_file{1});
+else
+    uifile = fullfile(guiprefs.mat_path,guiprefs.mat_file);
+end
+[filename,pathname] = ...
+    uigetfile({'*.mat','MAT-files (*.mat)'}, ...
+    'Select SonTek RiverSurveyor Live v3.60+ MAT File', ...
+    uifile, 'MultiSelect','on');
+
+if ischar(pathname) % The user did not hit "Cancel"
+    guiparams.data_folder = pathname;
+    if ischar(filename)
+        filename = {filename};
+    end
+    guiparams.data_files = filename;
+    guiparams.mat_file = '';
+    
+    setappdata(handles.figure1,'guiparams',guiparams)
+    
+    
+    
+    % Update the preferences:
+    % -----------------------
+    guiprefs = getappdata(handles.figure1,'guiprefs');
+    guiprefs.ascii_path = pathname;
+    guiprefs.ascii_file = filename;
+    setappdata(handles.figure1,'guiprefs',guiprefs)
+    store_prefs(handles.figure1,'ascii')
+    
+    % Push messages to Log Window:
+    % ----------------------------
+    log_text = {...
+        '';...
+        ['%--- ' datestr(now) ' ---%'];...
+        'Current Project Directory:';...
+        guiparams.data_folder;
+        'Loading the following files into memory:';...
+        char(filename)};
+    statusLogging(handles.LogWindow, log_text)
+    
+    % Read the file(s)
+    % ----------------
+    %A = parseSonTekVMT(fullfile(pathname,filename));
+    
+    [~,~,savefile,A,z] = ...
+        VMT_ReadFiles_SonTek(guiparams.data_folder,guiparams.data_files);
+    guiparams.savefile = savefile;
+    guiparams.A        = A;
+    guiparams.z        = z;
+    setappdata(handles.figure1,'guiparams',guiparams)
+    
+    % Process and display ShipTracks
+    % ------------------------------
+    shiptracksPlotCallback(hObject, eventdata, handles)
+    
+    % Update the GUI:
+    % ---------------
+    set_enable(handles,'fileloaded')
+end
+% [EOF] menuOpenSonTekMAT_Callback
+
+% --------------------------------------------------------------------
 function menuOpenMAT_Callback(hObject, eventdata, handles)
-axes(findobj(handles.figure1,'Tag','Plot1Shiptracks')); cla 
+axes(findobj(handles.figure1,'Tag','Plot1Shiptracks')); cla
+closeOpenFigures(hObject, eventdata, handles)
 % Get the Application data:
 % -------------------------
 guiparams = getappdata(handles.figure1,'guiparams');
@@ -252,52 +359,68 @@ end
     uifile, 'MultiSelect','on');
 
 if ischar(filename) % Single MAT file loaded
-    % Load the data:
-    % --------------
-    vars = load(fullfile(pathname,filename));
+    temp_filename = filename;
+elseif iscell(filename)
+    temp_filename = filename{1};
+else % Not a valid file
+    errordlg('The selected file is not a valid ADCP data MAT file.', ...
+        'Invalid File...')
+end
     
-    % Make sure the selected file is a valid file:
-    % --------------------------------------------
-    varnames = fieldnames(vars);
-    if isequal(sort(varnames),{'A' 'Map' 'V' 'z'}')
-        guiparams.mat_path = pathname;
-        guiparams.mat_file = filename;
-        guiparams.z = vars.z;
-        guiparams.A = vars.A;
-        guiparams.V = vars.V;
-        
-        % Update the preferences:
-        % -----------------------
-        guiprefs = getappdata(handles.figure1,'guiprefs');
-        guiprefs.mat_path = pathname;
-        guiprefs.mat_file = filename;
-        setappdata(handles.figure1,'guiprefs',guiprefs)
-        store_prefs(handles.figure1,'mat')
-                     
-        % Re-store the Application Data:
-        % ------------------------------
-        setappdata(handles.figure1,'guiparams',guiparams)
-        
-        % Update the GUI:
-        % ---------------
-        set(handles.HorizontalGridNodeSpacing,'String',vars.A(1).hgns)
-        set_enable(handles,'fileloaded')
-    else % Not a valid file
-        errordlg('The selected file is not a valid ADCP data MAT file.', ...
-            'Invalid File...')
-    end
+% Load the data:
+% --------------
+vars = load(fullfile(pathname,temp_filename)); %Use first file to get the HGNS and VGNS  
+
+% Make sure the selected file is a valid file:
+% --------------------------------------------
+varnames = fieldnames(vars);
+if isequal(sort(varnames),{'A' 'Map' 'V' 'z'}')
+    guiparams.mat_path = pathname;
+    guiparams.mat_file = temp_filename;
+    guiparams.z = vars.z;
+    guiparams.A = vars.A;
+    guiparams.V = vars.V;
+
+    % Update the preferences:
+    % -----------------------
+    guiprefs = getappdata(handles.figure1,'guiprefs');
+    guiprefs.mat_path = pathname;
+    guiprefs.mat_file = temp_filename;
+    setappdata(handles.figure1,'guiprefs',guiprefs)
+    store_prefs(handles.figure1,'mat')
+
+    % Re-store the Application Data:
+    % ------------------------------
+    setappdata(handles.figure1,'guiparams',guiparams)
+
+    % Update the GUI:
+    % ---------------
+    set(handles.HorizontalGridNodeSpacing,'String',vars.A(1).hgns)
+    guiparams.horizontal_grid_node_spacing = vars.A(1).hgns;
+    set_enable(handles,'fileloaded')
+else % Not a valid file
+    errordlg('The selected file is not a valid ADCP data MAT file.', ...
+        'Invalid File...')
+end
+
+% Set the vertical grid node spacing
+% ----------------------------------
+% For RioGrande probes, use the bin size, else just use the default
+% Backwards compatible
+if vars.A(1).Sup.wm ~= 3 % RG
+    set(handles.VerticalGridNodeSpacing,'String',double(vars.A(1).Sup.binSize_cm(1))/100)
+    guiparams.vertical_grid_node_spacing = double(vars.A(1).Sup.binSize_cm(1))/100;
+else % Older file, must be RG
+    set(handles.VerticalGridNodeSpacing,'String',0.4)
+    guiparams.vertical_grid_node_spacing = 0.4;
+end
+
+% Update the Application Data:
+% ------------------------------
+set_enable(handles,'fileloaded')
+setappdata(handles.figure1,'guiparams',guiparams)
     
-    % Set the vertical grid node spacing
-    % ----------------------------------
-    % For RioGrande probes, use the bin size, else just use the default
-    % Backwards compatible
-    if vars.A(1).Sup.wm ~= 3 % RG
-        set(handles.VerticalGridNodeSpacing,'String',double(vars.A(1).Sup.binSize_cm(1))/100)
-    else % Older file, must be RG
-        set(handles.VerticalGridNodeSpacing,'String',0.4)
-    end
-    
-elseif iscell(filename) % Multiple MAT files loaded
+if iscell(filename) % Multiple MAT files loaded
     % Set the filenames
     % -----------------
     guiparams.mat_path = pathname;
@@ -311,9 +434,31 @@ elseif iscell(filename) % Multiple MAT files loaded
     log_text = vertcat(log_text, pathname, {'Files:'}, filename');
     statusLogging(handles.LogWindow,log_text)
     
+    % Update V structure to include current plotting settings
+    guiparams.V.version = guiparams.vmt_version{1}; V.release = guiparams.vmt_version{2};
+    guiparams.V.plotSettings.shiptracks.horizontal_grid_node_spacing = guiparams.horizontal_grid_node_spacing;
+    guiparams.V.plotSettings.shiptracks.vertical_grid_node_spacing = guiparams.vertical_grid_node_spacing;
+    guiparams.V.plotSettings.planview.depth_range_min = guiparams.depth_range_min;
+    guiparams.V.plotSettings.planview.depth_range_max = guiparams.depth_range_max;
+    guiparams.V.plotSettings.planview.vector_scale_plan_view = guiparams.vector_scale_plan_view;
+    guiparams.V.plotSettings.planview.vector_spacing_plan_view = guiparams.vector_spacing_plan_view;
+    guiparams.V.plotSettings.planview.smoothing_window_size = guiparams.smoothing_window_size;
+    guiparams.V.plotSettings.planview.plotref = guiparams.plotref;
+    guiparams.V.plotSettings.mcs.contour = guiparams.contour;
+    guiparams.V.plotSettings.mcs.vertical_exaggeration = guiparams.vertical_exaggeration;
+    guiparams.V.plotSettings.mcs.vector_scale_cross_section = guiparams.vector_scale_cross_section;
+    guiparams.V.plotSettings.mcs.horizontal_vector_spacing = guiparams.horizontal_vector_spacing;
+    guiparams.V.plotSettings.mcs.vertical_vector_spacing = guiparams.vertical_vector_spacing;
+    guiparams.V.plotSettings.mcs.horizontal_smoothing_window = guiparams.horizontal_smoothing_window;
+    guiparams.V.plotSettings.mcs.vertical_smoothing_window = guiparams.vertical_smoothing_window;
+    guiparams.V.plotSettings.mcs.plot_secondary_flow_vectors = guiparams.plot_secondary_flow_vectors;
+    guiparams.V.plotSettings.mcs.secondary_flow_vector_variable = guiparams.secondary_flow_vector_variable;
+    guiparams.V.plotSettings.mcs.include_vertical_velocity = guiparams.include_vertical_velocity;
+    
     % Update the Application Data:
     % ------------------------------
     setappdata(handles.figure1,'guiparams',guiparams)
+    set_enable(handles,'multiplematfiles')
     
     % Update the persistent preferences:
     % ----------------------------------
@@ -322,13 +467,39 @@ elseif iscell(filename) % Multiple MAT files loaded
     guiprefs.mat_file = filename;
     setappdata(handles.figure1,'guiprefs',guiprefs)
     store_prefs(handles.figure1,'mat')
-        
-    % Update the GUI:
-    % ---------------
-    set_enable(handles,'multiplematfiles')
+end
+
+
+% Process and display ShipTracks if single cross-section loaded
+% ------------------------------
+if iscell(filename) % Multiple MAT files loaded 
+    ax = findobj(handles.figure1,'Tag','Plot1Shiptracks');
+    axes(ax)
+    pos = [xlim; ylim]/2; pos = pos(:,2)';
+    TextH = text(pos(1),pos(2), 'Multiple Mat-Files Loaded', ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'middle',...
+        'FontSize',14,...
+        'FontWeight','bold',...
+        'EdgeColor',[0 0 0],...
+        'LineWidth',1.5);
+else
+    shiptracksPlotCallback(hObject, eventdata, handles)
 end
 
 % [EOF] menuOpenMAT_Callback
+
+% --------------------------------------------------------------------
+function closeOpenFigures(hObject, eventdata, handles)
+fig_planview_handle = findobj(0,'name','Plan View Map');
+if ~isempty(fig_planview_handle) &&  ishandle(fig_planview_handle)
+    delete(fig_planview_handle)
+end
+fig_contour_handle = findobj(0,'name','Mean Cross Section Contour');
+if ~isempty(fig_contour_handle) &&  ishandle(fig_contour_handle)
+    delete(fig_contour_handle);
+end
+% [EOF] closeOpenFigures
 
 % --------------------------------------------------------------------
 function menuSave_Callback(hObject, eventdata, handles)
@@ -728,6 +899,7 @@ statusLogging(handles.LogWindow, log_text)
 % If there are multiple MAT files loaded, go ahead and export just the DAV
 % data.
 if iscell(guiparams.mat_file)
+    outputType = 'Multiple';
     % Force VMT to reprocess before outputing Excel
     planviewPlotCallback(hObject, eventdata, handles)
     % Refresh the Application Data:
@@ -738,174 +910,25 @@ if iscell(guiparams.mat_file)
     Map         = guiparams.Map;
     wse         = guiparams.water_surface_elevation;
     PVdata      = guiparams.iric_anv_planview_data;
-    log_text = {'Writing data to Excel file...';...
-        'Multiple transected loaded. Will export Planview Data Only!'};
-    [excel_file,excel_path] = uiputfile('*.xlsx','Save *.xlsx file',...
-        fullfile(excel_path,excel_file));
+    dataFiles = guiparams.mat_file;
+    dataPath  = guiparams.mat_path;
+    [log_text] = VMT_SaveExcelOutput(excel_path,excel_file,outputType,dataPath,dataFiles,V,A,z,Map,wse,PVdata);
     
-    if ischar(excel_path) % The user did not hit "Cancel"
-        outfile = fullfile(excel_path,excel_file);
-        %log_text = vertcat(log_text,{outfile});
-        
-    else
-        % Return default excel_path and excel_file
-        excel_path = guiprefs.excel_path;
-        excel_file = guiprefs.excel_file;
-        outfile = fullfile(excel_path,excel_file);
-        %log_text = vertcat(log_text,{outfile});
-    end
+%     if ischar(excel_path) % The user did not hit "Cancel"
+%         full_excelfile = fullfile(excel_path,excel_file);
+%         %log_text = vertcat(log_text,{outfile});
+%         
+%     else
+%         % Return default excel_path and excel_file
+%         excel_path = guiprefs.excel_path;
+%         excel_file = guiprefs.excel_file;
+%         full_excelfile = fullfile(excel_path,excel_file);
+%         %log_text = vertcat(log_text,{outfile});
+%     end
     
-    % Delete the old file if it exists
-    if exist(outfile, 'file') == 2
-        log_text = vertcat(log_text,{'Warning: The file';...
-            ['   ' outfile];...
-            'already exists. Overwriting file...'});
-        delete(outfile)
-    end
     
-    % Save MCS Summary to an Excel File
-    hwait = waitbar(0,'Exporting Excel File...');
-    xlswrite(outfile,{'Path:'}, 'VMTSummary','H3');
-    xlswrite(outfile,{'Files:'},'VMTSummary','H4');
-    if isempty(guiparams.data_files{1}) || ~isempty(guiparams.mat_file{1}) % Loaded MAT file
-        xlswrite(outfile,{guiparams.mat_path},'VMTSummary','I3');
-        sout = guiparams.mat_file';
-    end
-    xlswrite(outfile,sout,'VMTSummary','I4');
-    sout = {...
-        'VMT: SUMMARY OF MEAN CROSS SECTION' '' '' '' '' '';...
-        'VMT ' guiparams.vmt_version{1} guiparams.vmt_version{2} '' '' '';...
-        'Date Processed: ' datestr(now) '' '' '' '';...
-        '' '' '' '' '' '';...
-        'MEAN CROSS SECTION (MCS) PROPERTIES' '' '' '' '' '';...
-        'Horz. Grid Node Spacing (m):' '' '' '' '' guiparams.horizontal_grid_node_spacing;...
-        'Vert. Grid Node Spacing (m):' '' '' '' '' guiparams.vertical_grid_node_spacing;...
-        '' '' '' '' '' '';...
-        'SMOOTHED DATA PROPERTIES' '' '' '' '' '';...
-        'Smoothed Planview:' '' '' '' '' '';...
-        'Vector Spacing, in ground distance (m)' '' '' '' ''  num2str(guiparams.vector_spacing_plan_view*guiparams.horizontal_grid_node_spacing);...
-        'Vector Smoothing, in ground distance (m)' '' '' '' '' num2str(2*guiparams.smoothing_window_size*guiparams.horizontal_grid_node_spacing);...
-        '' '' '' '' '' '';...
-        'DATA STRUCTURE' '' '' '' '' '';...
-        '' '1. These data are the computed output from The Velocity Mapping Toolbox (VMT).' '' '' '' '';...
-        '' '2. VMT maps the loaded ADCP data to a mean cross-section (MCS), typically a line of best fit to the ADCP positions.' '' '' '' '';...
-        '' '3. The ADCP data are then interpolated to a user specified grid (see Cells F6:F7).' '' '' '' '';...
-        '' '4. VMT then averages the mapped and interpolated data to the MCS grid.' '' '' '' '';...
-        '' '5. For more information, see the VMT homepage: ' '' '' '' '';...
-        '' '=HYPERLINK("http://hydroacoustics.usgs.gov/movingboat/VMT/VMT.shtml")' '' '' '' '';...
-        'Planview:' '' '' '' '' '';...
-        '' '1. Units are indicated in the column titles.' '' '' '' '';...
-        '' '2. Values are for layer-avg quanties. Thus "dpthrng_0_to_Infm" would represent layer-averaging over the entire depth.' '' '' '' '';...
-        '' '3. If the user specifies a depth range, the column title will indicate it (e.g. "dpthrng_1.2_to_5m" would show resultant layer-averaged velocities over depths from 1.2 to 5 meters).' '' '' '' '';...
-        '' '4. NULL or missing data are represented as "-9999".' '' '' '' '';...
-        'Smoothed_Planview:' '' '' '' '' '';...
-        '' '1. Units are indicated in the column titles.' '' '' '' '';...
-        '' '2. Data are the actual vectors shown in the Planview plot, and reflect any user specified smoothing and/or spacings.' '' '' '' '';...
-        '' '3. Values are for layer-avg quanties. Thus "dpthrng_0_to_Infm" would represent layer-averaging over the entire depth.' '' '' '' '';...
-        '' '4. If the user specifies a depth range, the column title will indicate it (e.g. "dpthrng_1.2_to_5m" would show resultant layer-averaged velocities over depths from 1.2 to 5 meters).' '' '' '' '';...
-        '' '5. NULL or missing data are represented as "-9999".' '' '' '' '';...
-        '' '' '' '' '' '';...
-        'Further Notes:' '' '' '' '' '';...
-        '' '1. Timestamp values represent the average time over which the data are sampled. In the case of the Planview ' '' '' '' '';...
-        '' '   and MeanCrossSection worksheets, timestamps are the average based on the nearest ensembles (from the ADCP)' '' '' '' '';...
-        '' '   mapped to each grid node. For smoothed outputs, the timestamps are the average time over the smoothing window.' '' '' '' '';...
-        '' '   Thus if the smoothing window is 2, the time is the average of the 2 grid nodes on either side (5 nodes) of the' '' '' '' '';...
-        '' '   center of the smoothing window.' '' '' '' '';...
-        '' '' '' '' '' '';...
-        '' '' '' '' '' '';...
-        'Form last revised:' '' guiparams.vmt_version{2}(2:end) '' '' '';...
-        };
-    xlswrite(outfile,sout,'VMTSummary','A1');
-    
-    % Save DAV data to an Excel File
-    vmin = num2str(guiparams.depth_range_min);
-    vmax = num2str(guiparams.depth_range_max);
-    pvheaders = {...
-        'Timestamp' 'FileName' 'UTM_East' 'UTM_North' 'Dist_m' 'Bed_Elev_m'...
-        ['EastDAV_cm/s, dpth rng ' vmin ' to ' vmax ' m']...
-        ['NorthDAV_cm/s, dpth rng ' vmin ' to ' vmax ' m']...
-        'Vel_mag_cm/s' 'Vel_dir_deg'};
-
-    % Initialize Variables
-    pvdata = []; Dist = []; ID = {};
-    X = []; Y = []; E = []; T = [];
-    Ve = []; Vn =[]; Vm = []; Vd = [];
-    
-    % Concatenate data from all MAT files into arrays
-    for i = 1:length(guiparams.mat_file)
-        % Load current MAT-file
-        load(fullfile(guiparams.mat_path, guiparams.mat_file{i}))
-        
-        % Location, Time and Bathy
-        ID = vertcat(ID,repmat(guiparams.mat_file(i),length(V.mcsX(1,:)),1));
-        X = [X V.mcsX(1,:)];
-        Y = [Y V.mcsY(1,:)];
-        Dist = [Dist sort(V.mcsDist(1,:),'descend')];
-        E = [E V.mcsBedElev];
-        T = [T V.mcsTime(1,:)];
-                
-        % Build layer-averaged velocities
-        indx = find(V.mcsDepth(:,1) < str2num(vmin) | V.mcsDepth(:,1) > str2num(vmax));
-        V.mcsX(indx,:) = nan;
-        V.mcsY(indx,:) = nan;
-        V.mcsEast(indx,:) = nan;
-        V.mcsNorth(indx,:) = nan;
-        Ve = [Ve VMT_LayerAveMean(V.mcsDepth,V.mcsEast)];
-        Vn = [Vn VMT_LayerAveMean(V.mcsDepth,V.mcsNorth)];
-        Vm = [Vm sqrt(VMT_LayerAveMean(V.mcsDepth,V.mcsEast).^2 + VMT_LayerAveMean(V.mcsDepth,V.mcsNorth).^2)];
-        Vd = [Vd ari2geodeg(atan2(VMT_LayerAveMean(V.mcsDepth,V.mcsNorth),VMT_LayerAveMean(V.mcsDepth,V.mcsEast))*180/pi)];
-        
-        waitbar(i/(length(guiparams.mat_file)+1),hwait)
-    end
-    
-    % Put output into 1 matrix
-    pvdata = [...
-        X; Y; Dist; E;... % Bathy and locations
-        Ve; Vn; Vm; Vd... % Velocity
-        ];
-    pvdata(isnan(pvdata)) = -9999;
-    
-    % Create table and write to Excel
-    pvout = num2cell(pvdata');
-    pvout = horzcat(ID,pvout);
-    timestamp = cellstr(nandatestr(T));
-    pvout = vertcat(pvheaders,horzcat(timestamp,pvout));
-    xlswrite(outfile,pvout,'Planview');
-    
-    % Save the actual Planview plot data, which includes the smoothed
-    % results
-    PVheaders = {...
-        'Timestamp' 'FileName'...
-        'UTM_East_WGS84' 'UTM_North_WGS84' 'Dist_m'...
-        ['EastDAV_cms_dpthrng_' vmin '_to_' vmax 'm']...
-        ['NorthDAV_cms_dpthrng_' vmin '_to_' vmax 'm']...
-        'Vel_mag_cms' 'Vel_dir_deg'};
-    PVtable = [...
-        PVdata.outmat(1,:);...
-        PVdata.outmat(2,:);...
-        PVdata.outmat(7,:);...;...
-        PVdata.outmat(4,:).*100;...
-        PVdata.outmat(5,:).*100;...
-        sqrt(PVdata.outmat(4,:).^2 + PVdata.outmat(5,:).^2).*100;...
-        ari2geodeg(atan2(PVdata.outmat(5,:), PVdata.outmat(4,:))*180/pi)];
-    %PVtable = (sortrows(PVtable',3))';
-    PVtable(isnan(PVtable)) = -9999;
-    PVout = horzcat(...
-        cellstr(nandatestr(PVdata.outmat(6,:)')),...
-        PVdata.outfile,...
-        num2cell(PVtable'));
-    PVout = vertcat(PVheaders,PVout);
-    xlswrite(outfile,PVout,'Smoothed_Planview');
-    
-    % Close out waitbar
-    waitbar(1,hwait)
-    delete(hwait)
-    
-    % Push messages to Log Window:
-    % ----------------------------
-    statusLogging(handles.LogWindow, log_text)
 else
-    
+    outputType = 'Single';
     % Force VMT to reprocess before outputing Excel
     planviewPlotCallback(hObject, eventdata, handles)
     crosssectionPlotCallback(hObject, eventdata, handles)
@@ -918,343 +941,15 @@ else
     wse         = guiparams.water_surface_elevation;
     PVdata      = guiparams.iric_anv_planview_data; % this is what's in the 
                                                     % Planview Plot exactly
-    ID = PVdata.outfile;         % File name for for each data point in the 
-                                 % planview plot
-        
-    log_text = {'Writing data to Excel file...'};
-    [excel_file,excel_path] = uiputfile('*.xlsx','Save *.xlsx file',...
-        fullfile(excel_path,excel_file));
-    
-    if ischar(excel_path) % The user did not hit "Cancel"
-        outfile = fullfile(excel_path,excel_file);
-        %log_text = vertcat(log_text,{outfile});
-        
-        % Delete the old file if it exists
-        if exist(outfile, 'file') == 2
-            log_text = vertcat(log_text,{'Warning: The file';...
-                ['   ' outfile];...
-                'already exists. Overwriting file...'});
-            delete(outfile)
-        end
-        
-        % Push messages to Log Window:
-        % ----------------------------
-        statusLogging(handles.LogWindow, log_text)
-        
-        % Save MCS Summary to an Excel File
-        hwait = waitbar(0,'Exporting Excel File...');
-        xlswrite(outfile,{'Path:'}, 'VMTSummary','H3');
-        xlswrite(outfile,{'Files:'},'VMTSummary','H4'); 
-        waitbar(1/5,hwait)
-        if isempty(guiparams.data_files{1}) % Loaded MAT file
-            xlswrite(outfile,{guiparams.mat_path},'VMTSummary','I3');
-            sout = {guiparams.mat_file};
-        else % ASCII file(s)
-            xlswrite(outfile,{guiparams.data_folder},'VMTSummary','I3');
-            sout = guiparams.data_files';
-        end
-        xlswrite(outfile,sout,'VMTSummary','I4'); 
-        waitbar(2/7,hwait)
-        sout = {...
-            'VMT: SUMMARY OF MEAN CROSS SECTION' '' '' '' '' '';...
-            'VMT ' guiparams.vmt_version{1} guiparams.vmt_version{2} '' '' '';...
-            'Date Processed: ' datestr(now) '' '' '' '';...
-            '' '' '' '' '' '';...
-            'MEAN CROSS SECTION (MCS) PROPERTIES' '' '' '' '' '';...
-            'Horz. Grid Node Spacing (m):' '' '' '' '' guiparams.horizontal_grid_node_spacing;...
-            'Vert. Grid Node Spacing (m):' '' '' '' '' guiparams.vertical_grid_node_spacing;...
-            'Water Surface Elevation (m):'  '' '' '' '' wse;...
-            'Time of first velocity sample:'  '' '' '' '' datestr(nanmin(V.mcsTime(:)));...
-            'Time of last velocity sample:'  '' '' '' '' datestr(nanmax(V.mcsTime(:)));...
-            '' '' '' '' '' '';...
-            'SMOOTHED DATA PROPERTIES' '' '' '' '' '';...
-            'Smoothed Planview:' '' '' '' '' '';...
-            'Vector Spacing, in ground distance (m)' '' '' '' ''  num2str(guiparams.vector_spacing_plan_view*guiparams.horizontal_grid_node_spacing);...
-            'Vector Smoothing, in ground distance (m)' '' '' '' '' num2str(2*guiparams.smoothing_window_size*guiparams.horizontal_grid_node_spacing);...
-            'Smoothed Mean Cross Section:' '' '' '' '' '';...
-            'Horz. Vector Spacing, in ground distance (m)' '' '' '' '' num2str(guiparams.horizontal_vector_spacing*guiparams.horizontal_grid_node_spacing);...
-            'Horz. Vector Smoothing, in ground distance (m)' '' '' '' '' num2str(2*guiparams.horizontal_smoothing_window*guiparams.horizontal_grid_node_spacing);...
-            'Vert. Vector Spacing, in ground distance (m)' '' '' '' '' num2str(guiparams.vertical_vector_spacing*guiparams.vertical_grid_node_spacing);...
-            'Vert. Vector Smoothing, in ground distance (m)' '' '' '' '' num2str(2*guiparams.vertical_smoothing_window*guiparams.vertical_grid_node_spacing);...
-            '' '' '' '' '' '';...
-            'ENDPOINTS:' '' '' '' 'UTM_East'	'UTM_North';...
-            'Left Bank'	'' '' ''	V.xLeftBank V.yLeftBank;...
-            'Right Bank'	'' '' ''	V.xRightBank V.yRightBank;...
-            'Total Length in meters' '' '' '' '' V.dl;...
-            '' '' '' '' '' '';...
-            'Mean Flow Direction (deg)' '' '' '' '' num2str(V.mfd);...
-            'in geographic coordinates' '' '' '' '' '';...
-            '' '' '' '' '' '';...
-            'Slope'	'' '' '' '' V.m;...
-            'Intercept'	'' '' '' '' V.b;...
-            'Theta (deg)'	'' '' '' '' V.theta
-            '' '' '' '' '' '';...
-            '' '' '' '' '' '';...
-            'DATA STRUCTURE' '' '' '' '' '';...
-            '' '1. These data are the computed output from The Velocity Mapping Toolbox (VMT).' '' '' '' '';...
-            '' '2. VMT maps the loaded ADCP data to a mean cross-section (MCS), typically a line of best fit to the ADCP positions.' '' '' '' '';...
-            '' '3. The ADCP data are then interpolated to a user specified grid (see Cells F6:F7).' '' '' '' '';...
-            '' '4. VMT then averages the mapped and interpolated data to the MCS grid.' '' '' '' '';...
-            '' '5. For more information, see the VMT homepage: ' '' '' '' '';...
-            '' '=HYPERLINK("http://hydroacoustics.usgs.gov/movingboat/VMT/VMT.shtml")' '' '' '' '';...
-            'Planview:' '' '' '' '' '';...
-            '' '1. Units are indicated in the column titles.' '' '' '' '';...
-            '' '2. Values are for layer-avg quanties. Thus "dpthrng_0_to_Infm" would represent layer-averaging over the entire depth.' '' '' '' '';...
-            '' '3. If the user specifies a depth range, the column title will indicate it (e.g. "dpthrng_1.2_to_5m" would show resultant layer-averaged velocities over depths from 1.2 to 5 meters).' '' '' '' '';...
-            '' '4. NULL or missing data are represented as "-9999".' '' '' '' '';...
-            'MeanCrossSection:' '' '' '' '' '';...
-            '' '1. Data are in vectorized i,j structure, where i is the index into the horizontal, j is index to vertical. Thus, the first j rows correspond to vertical i.' '' '' '' '';...
-            '' '2. Bed elevation is computed as the entered water surface elevation minus depth at each vertical location (if WSE=0, the elevations will be negative).' '' '' '' '';...
-            '' '3. NULL or missing data are represented as "-9999".' '' '' '' '';...
-            'Smoothed_Planview:' '' '' '' '' '';...
-            '' '1. Units are indicated in the column titles.' '' '' '' '';...
-            '' '2. Data are the actual vectors shown in the Planview plot, and reflect any user specified smoothing and/or spacings.' '' '' '' '';...
-            '' '3. Values are for layer-avg quanties. Thus "dpthrng_0_to_Infm" would represent layer-averaging over the entire depth.' '' '' '' '';...
-            '' '4. If the user specifies a depth range, the column title will indicate it (e.g. "dpthrng_1.2_to_5m" would show resultant layer-averaged velocities over depths from 1.2 to 5 meters).' '' '' '' '';...
-            '' '5. NULL or missing data are represented as "-9999".' '' '' '' '';...
-            'Smoothed_MeanCrossSection:' '' '' '' '' '';...
-            '' '1. Units are indicated in the column titles.' '' '' '' '';...
-            '' '2. Data are the actual vectors shown in the Mean Cross Section plot, and reflect any user specified smoothing and/or spacings.' '' '' '' '';...
-            '' '3. NULL or missing data are represented as "-9999".' '' '' '' '';...
-			'' '' '' '' '' '';...
-            'Further Notes:' '' '' '' '' '';...
-            '' '1. Timestamp values represent the average time over which the data are sampled. In the case of the Planview ' '' '' '' '';...
-            '' '   and MeanCrossSection worksheets, timestamps are the average based on the nearest ensembles (from the ADCP)' '' '' '' '';...
-            '' '   mapped to each grid node. For smoothed outputs, the timestamps are the average time over the smoothing window.' '' '' '' '';...
-            '' '   Thus if the smoothing window is 2, the time is the average of the 2 grid nodes on either side (5 nodes) of the' '' '' '' '';...
-            '' '   center of the smoothing window.' '' '' '' '';...
-            '' '' '' '' '' '';...
-            '' '' '' '' '' '';...
-            'Form last revised:' '' guiparams.vmt_version{2}(2:end) '' '' '';...
-            };
-        xlswrite(outfile,sout,'VMTSummary','A1'); 
-        waitbar(3/7,hwait)
-        
-        % Save DAV data to an Excel File
-        vmin = num2str(guiparams.depth_range_min);
-        vmax = num2str(guiparams.depth_range_max);
-        pvheaders = {...
-            'Timestamp'...
-            ...'FileName'...
-            'UTM_East_WGS84' 'UTM_North_WGS84' 'Dist_m' 'Bed_Elev_m'...
-            ['EastDAV_cms_dpthrng_' vmin '_to_' vmax 'm']...
-            ['NorthDAV_cms_dpthrng_' vmin '_to_' vmax 'm']...
-            'Vel_mag_cms' 'Vel_dir_deg'};
-        
-        % Create block style matrix of all processed data    
-        % This does not include the smoothed data results from the plots.
-        % This is for EACH grid node specified by hgns/vgns, with the
-        % layer-averaging applied
-        pvdata = [];
-        
-        % Stationing from LEFT bank
-        Dist = V.mcsDist;
-        
-        % Build bathy data matrix
-        pvdata = [V.mcsX(1,:); V.mcsY(1,:); Dist(1,:); V.mcsBedElev];
-        
-        % Build layer-averaged velocities
-        indx = find(V.mcsDepth(:,1) < str2num(vmin) | V.mcsDepth(:,1) > str2num(vmax));
-        V.mcsX(indx,:) = nan;
-        V.mcsY(indx,:) = nan;
-        V.mcsEast(indx,:) = nan;
-        V.mcsNorth(indx,:) = nan;
-        pvdata = [...
-            pvdata;...
-            VMT_LayerAveMean(V.mcsDepth,V.mcsEast);...
-            VMT_LayerAveMean(V.mcsDepth,V.mcsNorth);...
-            sqrt(VMT_LayerAveMean(V.mcsDepth,V.mcsEast).^2 + VMT_LayerAveMean(V.mcsDepth,V.mcsNorth).^2);...
-            ari2geodeg(atan2(VMT_LayerAveMean(V.mcsDepth,V.mcsNorth), VMT_LayerAveMean(V.mcsDepth,V.mcsEast))*180/pi)];
-        pvdata(isnan(pvdata)) = -9999;
-        pvout = num2cell(pvdata');
-        %pvout = horzcat(repmat(ID(1),length(pvout(:,1)),1),pvout);
-        timestr = nandatestr(V.mcsTime(1,:));
-        timestamp = cellstr(timestr);
-        pvout = horzcat(timestamp,pvout);
-        pvout = vertcat(pvheaders,pvout);
-        xlswrite(outfile,pvout,'Planview');
-        waitbar(4/7,hwait)
-        
-        % Save MCS data to an Excel File
-        % This does not include the smoothed data results from the plots.
-        % This is for EACH grid node specified by hgns/vgns
-        MCSheaders = {...
-            'Timestamp'...
-            'UTM_East' ...
-            'UTM_North'...
-            'Distance from Left Bank, in meters'...
-            'Elevation, in meters'...
-            ...'Bed Elevation, in meters'...
-            'East Velocity, in cm/s'...
-            'North Velocity, in cm/s'...
-            'Vertical Velocity, in cm/s'...
-            'Velocity Magnitude, in cm/s'...
-            'Velocity Direction, in degrees (geographic coordinates)'...
-            'Streamwise Velocity, in cm/s'...
-            'Transverse Velocity, in cm/s'...
-            'Primary Velocity (zsd), in cm/s'...
-            'Secondary Velocity (zsd), in cm/s'...
-            'Primary Velocity (roz), in cm/s'...
-            'Secondary Velocity (roz), in cm/s'};
-        
-        vectorized_bed = meshgrid(V.mcsBedElev,V.mcsDepth(:,1));
-        MCSdata = [...
-            V.mcsX(:)...
-            V.mcsY(:)...
-            V.mcsDist(:)...
-            vectorized_bed(:)...
-            ...(str2num(wse) - V.mcsDepth(:))...
-            ...repmat((wse - V.mcsBed(:)),size(V.mcsX,1),1)...
-            V.mcsEast(:)...
-            V.mcsNorth(:)...
-            V.mcsVert(:)...
-            V.mcsMag(:)...
-            V.mcsDir(:)...
-            V.u(:)...
-            V.v(:)...
-            V.vp(:)...
-            V.vs(:)...
-            V.Roz.up(:)...
-            V.Roz.us(:)];
-        MCSdata(isnan(MCSdata)) = -9999;
-        timestamp = cellstr(nandatestr(V.mcsTime(:)));
-        MCSout = vertcat(MCSheaders,horzcat(timestamp,num2cell(MCSdata)));
-        xlswrite(outfile,MCSout,'MeanCrossSection');
-        waitbar(5/7,hwait)
-                
-        % Save the actual Planview plot data, which includes the smoothed
-        % results
-        % Compute distance from the LEFT bank using the MCS endpoints
-        PVDist = hypot(V.xLeftBank-PVdata.outmat(1,:),V.yLeftBank-PVdata.outmat(2,:));
-        PVheaders = {...
-            'Timestamp'...
-            'UTM_East_WGS84'...
-            'UTM_North_WGS84'...
-            'Dist_m'...
-            ['EastDAV_cms_dpthrng_' vmin '_to_' vmax 'm']...
-            ['NorthDAV_cms_dpthrng_' vmin '_to_' vmax 'm']...
-            'Vel_mag_cms'...
-            'Vel_dir_deg'};
-        PVtable = [...
-            PVdata.outmat(1,:);...
-            PVdata.outmat(2,:);...
-            PVDist;...
-            PVdata.outmat(4,:).*100;...
-            PVdata.outmat(5,:).*100;...
-            sqrt(PVdata.outmat(4,:).^2 + PVdata.outmat(5,:).^2).*100;...
-            ari2geodeg(atan2(PVdata.outmat(5,:), PVdata.outmat(4,:))*180/pi)];
-        PVtable = (sortrows(PVtable',3))';
-        PVtable(isnan(PVtable)) = -9999;
-        PVout = horzcat(cellstr(nandatestr(PVdata.outmat(6,:)')), num2cell(PVtable'));
-        PVout = vertcat(PVheaders,PVout);
-        xlswrite(outfile,PVout,'Smoothed_Planview');
-        waitbar(6/7,hwait)
-        
-        % Save the actual MCS plot data, which includes the smoothed
-        % results
-        % Distance is from the LEFT bank
-        % Doesn't include the reference vector
-        compstr = [guiparams.contour '_' guiparams.secondary_flow_vector_variable];
-        dist    = guiparams.mcsQuivers(1:end-1,1);
-        depth   = guiparams.mcsQuivers(1:end-1,2);
-        vcomp   = guiparams.mcsQuivers(1:end-1,3);
-        wcomp   = guiparams.mcsQuivers(1:end-1,4);
-        
-        % Compute an UTM coordinate for the vector
-        pUTMx = interp1(V.mcsDist(1,:),V.mcsX(1,:),dist);
-        pUTMy = interp1(V.mcsDist(1,:),V.mcsY(1,:),dist);
-        
-        % Compute a Time for each vector
-        pTime = interp1(V.mcsDist(1,:),V.mcsTime(1,:),dist);
-        
-        % Compute the streamwise component at each vector in the MCS plot
-        switch guiparams.contour
-            case 'streamwise'   %Plots the streamwise velocity
-                wtp=['V.uSmooth'];
-            case 'transverse'  %Plots the transverse velocity
-                wtp=['V.vSmooth'];
-            case 'vertical'  %Plots the vertical velocity
-                wtp=['V.wSmooth'];
-            case 'mag'  %Plots the velocity magnitude
-                wtp=['V.mcsMagSmooth'];
-            case 'east'  %Plots the east velocity
-                wtp=['V.mcsEastSmooth'];
-            case 'error'  %Plots the error velocity
-                wtp=['V.mcsErrorSmooth'];
-            case 'north'  %Plots the north velocity
-                wtp=['V.mcsNorthSmooth'];
-            case 'primary_zsd'   %Plots the primary velocity with zero secondary discharge definition
-                wtp=['V.vpSmooth'];
-            case 'secondary_zsd'  %Plots the secondary velocity with zero secondary discharge definition
-                wtp=['V.vsSmooth'];
-            case 'primary_roz'   %Plots the primary velocity with Rozovskii definition
-                wtp=['V.Roz.upSmooth'];
-            case 'secondary_roz'  %Plots the secondary velocity with Rozovskii definition
-                wtp=['V.Roz.usSmooth'];
-            case 'primary_roz_x'   %Plots the primary velocity with Rozovskii definition (downstream component)
-                wtp=['V.Roz.upxSmooth'];
-            case 'primary_roz_y'   %Plots the primary velocity with Rozovskii definition (cross-stream component)
-                wtp=['V.Roz.upySmooth'];
-            case 'secondary_roz_x'  %Plots the secondary velocity with Rozovskii definition (downstream component)
-                wtp=['V.Roz.usxSmooth'];
-            case 'secondary_roz_y'  %Plots the secondary velocity with Rozovskii definition (cross-stream component)
-                wtp=['V.Roz.usySmooth'];
-            case 'backscatter'  %Plots the backscatter
-                wtp=['V.mcsBackSmooth'];
-            case 'flowangle'  %Plots the flow direction (N = 0.0 deg)
-                wtp=['V.mcsDirSmooth'];
-            case 'vorticity_vw'
-                wtp=['V.vorticity_vw'];
-            case 'vorticity_zsd'
-                wtp=['V.vorticity_zsd'];
-            case 'vorticity_roz'
-                wtp=['V.vorticity_roz'];
-        end
-        Ucomp = eval(wtp);
-        ucomp = interp2(V.mcsDist,V.mcsDepth,Ucomp,dist,depth);
-        
-        % Save MCS data to an Excel File
-        % This includes the smoothed data results from the plots.
-        % This is for EACH VECTOR on the MCS plot
-        u_str = regexprep(lower(guiparams.contour),'(\<[a-z])','${upper($1)}');
-        v_str = regexprep(lower(guiparams.secondary_flow_vector_variable),'(\<[a-z])','${upper($1)}');
-        mcsheaders = {...
-            'Timestamp'...
-            'UTM_East_WGS84'...
-            'UTM_North_WGS84'...
-            'Distance from Left Bank, in meters'...
-            'Depth from surface, in meters'...
-            ...'Bed Elevation, in meters'...
-            [u_str ' Velocity, in cm/s']...
-            [v_str ' Velocity, in cm/s']...
-            'Vertical Velocity, in cm/s'...
-            };
-        mcsdata = [...
-            pUTMx(:)...
-            pUTMy(:)...
-            dist(:)...
-            depth(:)...
-            ucomp(:)...
-            vcomp(:)...
-            wcomp(:)];
-        % Keep only data where there is a full 3D vector (u,v,w)
-        ridx = ~isnan(ucomp);
-        mcsdata = mcsdata(ridx,:);
-        mcsdata(isnan(mcsdata)) = -9999;
-        mcsout = vertcat(mcsheaders,horzcat(cellstr(nandatestr(pTime(ridx))), num2cell(mcsdata)));
-        xlswrite(outfile,mcsout,'Smoothed_MeanCrossSection');
-        waitbar(7/7,hwait)
-    else
-        % Return default excel_path and excel_file
-        excel_path = guiprefs.excel_path;
-        excel_file = guiprefs.excel_file;
-        outfile = fullfile(excel_path,excel_file);
-        log_text = {'User aborted Excel export...'};
+  
+    if isempty(guiparams.data_files{1}) % Loaded MAT file
+        dataFiles = {guiparams.mat_file};
+        dataPath  = {guiparams.mat_path};
+    else % ASCII file(s)
+        dataFiles = guiparams.data_files';
+        dataPath  = {guiparams.ascii_path};
     end
-    
-    
-waitbar(1,hwait)  
-delete(hwait)
+    [log_text] = VMT_SaveExcelOutput(excel_path,excel_file,outputType,dataPath,dataFiles,V,A,z,Map,wse,PVdata);
 end
 
 % Push messages to Log Window:
@@ -1853,8 +1548,9 @@ function menuTools_Callback(hObject, eventdata, handles)
 % Empty
 
 % --------------------------------------------------------------------
-function menuASCII2GIS_Callback(hObject, eventdata, handles)
-ASCII2GIS_GUI
+function menuGISExportTool_Callback(hObject, eventdata, handles)
+% Formerly ASCII2GIS_GUI Tool
+VMT_GISExportTool_GUI
 % [EOF] menuASCII2GIS_Callback
 
 % --------------------------------------------------------------------
@@ -1880,6 +1576,11 @@ guiprefs.kmz_file = outfile;
 setappdata(handles.figure1,'guiprefs',guiprefs)
 
 % [EOF] menuASCII2KML_Callback
+
+% --------------------------------------------------------------------
+function menuSonTekMAT2KML_Callback(hObject, eventdata, handles)
+SontekMAT2KML;
+% [EOF] menuSonTekMAT2KML_Callback
 
 % --------------------------------------------------------------------
 function menuOpenBatchMode_Callback(hObject, eventdata, handles)
@@ -2065,7 +1766,8 @@ h = msgbox(messagestr,'About VMT'); %#ok<NASGU>
 
 % --------------------------------------------------------------------
 function loadDataCallback(hObject, eventdata, handles)
-axes(findobj(handles.figure1,'Tag','Plot1Shiptracks')); cla 
+axes(findobj(handles.figure1,'Tag','Plot1Shiptracks')); cla
+closeOpenFigures(hObject, eventdata, handles)
 % Read Files into Data Structure using tfile.
 
 % Get the Application data:
@@ -2133,11 +1835,14 @@ if ischar(pathname) % The user did not hit "Cancel"
         guiparams.vertical_grid_node_spacing = 0.4;
     end
     
-    
     % Save application data
     % ---------------------
     setappdata(handles.figure1,'guiparams',guiparams)
-       
+   
+    % Process and display ShipTracks
+    % ------------------------------
+    shiptracksPlotCallback(hObject, eventdata, handles)
+    
 %     
 %     % Preprocess the data:
 %     % --------------------
@@ -2363,6 +2068,28 @@ V = VMT_SmoothVar(V, ...
     guiparams.vertical_smoothing_window);
 [V] = VMT_Vorticity(V);
 
+% Update V structure to include current plotting settings
+V.version = guiparams.vmt_version{1}; V.release = guiparams.vmt_version{2};
+V.plotSettings.shiptracks.horizontal_grid_node_spacing = guiparams.horizontal_grid_node_spacing;
+V.plotSettings.shiptracks.vertical_grid_node_spacing = guiparams.vertical_grid_node_spacing;
+V.plotSettings.planview.depth_range_min = guiparams.depth_range_min;
+V.plotSettings.planview.depth_range_max = guiparams.depth_range_max;
+V.plotSettings.planview.vector_scale_plan_view = guiparams.vector_scale_plan_view;
+V.plotSettings.planview.vector_spacing_plan_view = guiparams.vector_spacing_plan_view;
+V.plotSettings.planview.smoothing_window_size = guiparams.smoothing_window_size;
+V.plotSettings.planview.plotref = guiparams.plotref;
+V.plotSettings.mcs.contour = guiparams.contour;
+V.plotSettings.mcs.vertical_exaggeration = guiparams.vertical_exaggeration;
+V.plotSettings.mcs.vector_scale_cross_section = guiparams.vector_scale_cross_section;
+V.plotSettings.mcs.horizontal_vector_spacing = guiparams.horizontal_vector_spacing;
+V.plotSettings.mcs.vertical_vector_spacing = guiparams.vertical_vector_spacing;
+V.plotSettings.mcs.horizontal_smoothing_window = guiparams.horizontal_smoothing_window;
+V.plotSettings.mcs.vertical_smoothing_window = guiparams.vertical_smoothing_window;
+V.plotSettings.mcs.plot_secondary_flow_vectors = guiparams.plot_secondary_flow_vectors;
+V.plotSettings.mcs.secondary_flow_vector_variable = guiparams.secondary_flow_vector_variable;
+V.plotSettings.mcs.include_vertical_velocity = guiparams.include_vertical_velocity;
+
+
 % Push messages to Log Window:
 % ----------------------------
 statusLogging(handles.LogWindow, processing_log_text)
@@ -2584,6 +2311,27 @@ if guiparams.add_background
     statusLogging(handles.LogWindow, log_text)
 end
 
+% Update V structure to include current plotting settings
+V.version = guiparams.vmt_version{1}; V.release = guiparams.vmt_version{2};
+V.plotSettings.shiptracks.horizontal_grid_node_spacing = guiparams.horizontal_grid_node_spacing;
+V.plotSettings.shiptracks.vertical_grid_node_spacing = guiparams.vertical_grid_node_spacing;
+V.plotSettings.planview.depth_range_min = guiparams.depth_range_min;
+V.plotSettings.planview.depth_range_max = guiparams.depth_range_max;
+V.plotSettings.planview.vector_scale_plan_view = guiparams.vector_scale_plan_view;
+V.plotSettings.planview.vector_spacing_plan_view = guiparams.vector_spacing_plan_view;
+V.plotSettings.planview.smoothing_window_size = guiparams.smoothing_window_size;
+V.plotSettings.planview.plotref = guiparams.plotref;
+V.plotSettings.mcs.contour = guiparams.contour;
+V.plotSettings.mcs.vertical_exaggeration = guiparams.vertical_exaggeration;
+V.plotSettings.mcs.vector_scale_cross_section = guiparams.vector_scale_cross_section;
+V.plotSettings.mcs.horizontal_vector_spacing = guiparams.horizontal_vector_spacing;
+V.plotSettings.mcs.vertical_vector_spacing = guiparams.vertical_vector_spacing;
+V.plotSettings.mcs.horizontal_smoothing_window = guiparams.horizontal_smoothing_window;
+V.plotSettings.mcs.vertical_smoothing_window = guiparams.vertical_smoothing_window;
+V.plotSettings.mcs.plot_secondary_flow_vectors = guiparams.plot_secondary_flow_vectors;
+V.plotSettings.mcs.secondary_flow_vector_variable = guiparams.secondary_flow_vector_variable;
+V.plotSettings.mcs.include_vertical_velocity = guiparams.include_vertical_velocity;
+
 % Update guiparams
 % ----------------
 guiparams.z   = z;
@@ -2722,7 +2470,8 @@ elseif ~guiparams.plot_secondary_flow_vectors
         guiparams.contour, ...
         guiparams.vertical_exaggeration, ...
         guiparams.english_units, ...
-        guiparams.allow_vmt_flip_flux);  %#ok<ASGLU>
+        guiparams.allow_vmt_flip_flux,...
+        guiparams.start_bank); %#ok<ASGLU> % PLOT3
     
     guiparams.zmin = zmin;
     guiparams.zmax = zmax;
@@ -2751,6 +2500,27 @@ hff = findobj('name','Mean Cross Section Contour');
 if ~isempty(hff) &&  ishandle(hff)
     figure(hff)
 end
+% Update V structure to include current plotting settings
+V.version = guiparams.vmt_version{1}; V.release = guiparams.vmt_version{2};
+V.plotSettings.shiptracks.horizontal_grid_node_spacing = guiparams.horizontal_grid_node_spacing;
+V.plotSettings.shiptracks.vertical_grid_node_spacing = guiparams.vertical_grid_node_spacing;
+V.plotSettings.planview.depth_range_min = guiparams.depth_range_min;
+V.plotSettings.planview.depth_range_max = guiparams.depth_range_max;
+V.plotSettings.planview.vector_scale_plan_view = guiparams.vector_scale_plan_view;
+V.plotSettings.planview.vector_spacing_plan_view = guiparams.vector_spacing_plan_view;
+V.plotSettings.planview.smoothing_window_size = guiparams.smoothing_window_size;
+V.plotSettings.planview.plotref = guiparams.plotref;
+V.plotSettings.mcs.contour = guiparams.contour;
+V.plotSettings.mcs.vertical_exaggeration = guiparams.vertical_exaggeration;
+V.plotSettings.mcs.vector_scale_cross_section = guiparams.vector_scale_cross_section;
+V.plotSettings.mcs.horizontal_vector_spacing = guiparams.horizontal_vector_spacing;
+V.plotSettings.mcs.vertical_vector_spacing = guiparams.vertical_vector_spacing;
+V.plotSettings.mcs.horizontal_smoothing_window = guiparams.horizontal_smoothing_window;
+V.plotSettings.mcs.vertical_smoothing_window = guiparams.vertical_smoothing_window;
+V.plotSettings.mcs.plot_secondary_flow_vectors = guiparams.plot_secondary_flow_vectors;
+V.plotSettings.mcs.secondary_flow_vector_variable = guiparams.secondary_flow_vector_variable;
+V.plotSettings.mcs.include_vertical_velocity = guiparams.include_vertical_velocity;
+V.plotSettings.mcs.mcsQuivers = guiparams.mcsQuivers;  % Move this with the newer plotting routine update FLE 4/27/2017
 
 % Re-store the Application data:
 % ------------------------------
@@ -3756,27 +3526,27 @@ handles.toolbarProcessingParameters = ...
 % Zoom In
 % [icon,map] = imread('C:\Users\pfricker\Desktop\icons\ParameterIcon.gif');
 % icon = ind2rgb(icon,map);
-handles.toolbarZoomIn = ...
-    uitoggletool('Parent',       ht, ...
-    'CData',        icons(8).data, ...
-    'TooltipString','Zoom In (Shiptracks)', ...
-    'Separator',     'on');
+% handles.toolbarZoomIn = ...
+%     uitoggletool('Parent',       ht, ...
+%     'CData',        icons(8).data, ...
+%     'TooltipString','Zoom In (Shiptracks)', ...
+%     'Separator',     'on');
 
 % Zoom Out
 % [icon,map] = imread('C:\Users\pfricker\Desktop\icons\ParameterIcon.gif');
 % icon = ind2rgb(icon,map);
-handles.toolbarZoomOut = ...
-    uitoggletool('Parent',       ht, ...
-    'CData',        icons(9).data, ...
-    'TooltipString','Zoom Out (Shiptracks)');
+% handles.toolbarZoomOut = ...
+%     uitoggletool('Parent',       ht, ...
+%     'CData',        icons(9).data, ...
+%     'TooltipString','Zoom Out (Shiptracks)');
 
 % Pan
 % [icon,map] = imread('C:\Users\pfricker\Desktop\icons\ParameterIcon.gif');
 % icon = ind2rgb(icon,map);
-handles.toolbarPan = ...
-    uipushtool('Parent',       ht, ...
-    'CData',        icons(10).data, ...
-    'TooltipString','Pan (Shiptracks)');
+% handles.toolbarPan = ...
+%     uipushtool('Parent',       ht, ...
+%     'CData',        icons(10).data, ...
+%     'TooltipString','Pan (Shiptracks)');
 
 
 
@@ -3787,14 +3557,12 @@ set(handles.toolbarSaveFigures,         'ClickedCallback',{@menuExportFigures_Ca
 set(handles.toolbarSaveExcel,           'ClickedCallback',{@menuSaveExcel_Callback,handles})
 set(handles.toolbarPlottingParameters,  'ClickedCallback',{@plottingParametersCallback,handles})
 set(handles.toolbarProcessingParameters,'ClickedCallback',{@processingParametersCallback,handles})
-set(handles.toolbarZoomIn,              'ClickedCallback',{@ShiptracksZoom_Callback,handles})
-set(handles.toolbarZoomOut,             'ClickedCallback',{@ShiptracksZoom_Callback,handles})
-set(handles.toolbarPan,                 'ClickedCallback',{@ShiptracksPan_Callback,handles})
+% set(handles.toolbarZoomIn,              'ClickedCallback',{@ShiptracksZoom_Callback,handles})
+% set(handles.toolbarZoomOut,              'ClickedCallback',{@ShiptracksZoom_Callback,handles})
+% set(handles.toolbarPan,              'ClickedCallback',{@ShiptracksPan_Callback,handles})
 % set(handles.planviewPlot,        'ClickedCallback',{@planviewPlotCallback,handles})
 % set(handles.crosssectionPlot,    'ClickedCallback',{@crosssectionPlotCallback,handles})
 
-h.ActionPreCallback = @myprecallback;
-h.ActionPostCallback = @mypostcallback;
 % [EOF] buildtoolbar
 
 
@@ -3881,6 +3649,32 @@ else % Initialize MAT
     mat.path = pwd;
     mat.file = '';
     setpref('VMT','mat',mat)
+end
+
+% SONTEK
+if ispref('VMT','sontek')
+    sontek = getpref('VMT','sontek');
+    if exist(sontek.path,'dir')
+        guiprefs.sontek_path = sontek.path;
+    else
+        guiprefs.sontek_path = pwd;
+    end
+    does_exist = false(1,length(sontek.file));
+    for k = 1:length(sontek.file) % Check each file one-by-one
+        does_exist(k) = exist(fullfile(sontek.path,sontek.file{k}),'file');
+    end
+    if any(does_exist)
+        guiprefs.sontek_file = sontek.file(does_exist);
+    else
+        guiprefs.sontek_file = {''};
+    end
+else % Initialize SONTEK
+    guiprefs.sontek_path = pwd;
+    guiprefs.sontek_file = {''};
+    
+    sontek.path = pwd;
+    sontek.file = {''};
+    setpref('VMT','sontek',sontek)
 end
 
 % TECPLOT
@@ -5712,13 +5506,9 @@ guiparams.gui_state   = 'init';
 % [EOF] createGUIparams
 
 function ShiptracksZoom_Callback(obj,evd,handles)
-ax = findobj('Tag','Plot1Shiptracks');
-axes(ax);
 ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM (when zooming) 
 
 function ShiptracksPan_Callback(obj,evd,handles)
-ax = findobj('Tag','Plot1Shiptracks');
-axes(ax);
 ticks_format('%6.0f','%8.0f'); %formats the ticks for UTM (when panning) 
 
 % [EOF] VMT
@@ -5747,87 +5537,6 @@ else
 end
 
 switch input
-    % Hidden SonTek M9 support
-    case 'shiftcontrols'
-        msgtxt = {...
-            'VMT offers limited support for SonTek M9/S5 data.';...
-            'SonTek RiverSurveyorLive required data format:';...
-            '      -ENU coordinates';...
-            '      -Desired GPS reference (BT/GGA/VTG)'
-            '';...
-            'Abosolutely NO GUARANTEE is made or implied that this';...
-            'functionality will work for all cases. Results are';...
-            'PROVISIONAL at best.'};
-        msgbox(msgtxt, 'Hidden Functionality: Process SonTek M9', 'warn','replace')
-        
-        % Get the Application data:
-        % -------------------------
-        guiparams = getappdata(handles.figure1,'guiparams');
-        guiprefs = getappdata(handles.figure1,'guiprefs');
-        
-        % Ask the user to select files:
-        % -----------------------------
-        % current_file = fullfile(guiparams.data_folder,guiparams.data_files{1});
-        % current_file = fullfile(guiprefs.mat_path,guiprefs.mat_file);
-        if iscell(guiprefs.mat_file)
-            uifile = fullfile(guiprefs.mat_path,guiprefs.mat_file{1});
-        else
-            uifile = fullfile(guiprefs.mat_path,guiprefs.mat_file);
-        end
-        [filename,pathname] = ...
-            uigetfile({'*.mat','MAT-files (*.mat)'}, ...
-            'Select SonTek RiverSurveyor Live v3.60 MAT File', ...
-            uifile, 'MultiSelect','on');
-        
-        if ischar(pathname) % The user did not hit "Cancel"
-            guiparams.data_folder = pathname;
-            if ischar(filename)
-                filename = {filename};
-            end
-            guiparams.data_files = filename;
-            guiparams.mat_file = '';
-            
-            setappdata(handles.figure1,'guiparams',guiparams)
-            
-            
-            
-            % Update the preferences:
-            % -----------------------
-            guiprefs = getappdata(handles.figure1,'guiprefs');
-            guiprefs.ascii_path = pathname;
-            guiprefs.ascii_file = filename;
-            setappdata(handles.figure1,'guiprefs',guiprefs)
-            store_prefs(handles.figure1,'ascii')
-            
-            % Push messages to Log Window:
-            % ----------------------------
-            log_text = {...
-                '';...
-                ['%--- ' datestr(now) ' ---%'];...
-                'Current Project Directory:';...
-                guiparams.data_folder;
-                'Loading the following files into memory:';...
-                char(filename)};
-            statusLogging(handles.LogWindow, log_text)
-            
-            % Read the file(s)
-            % ----------------
-            %A = parseSonTekVMT(fullfile(pathname,filename));
-            
-            [~,~,savefile,A,z] = ...
-                VMT_ReadFiles_SonTek(guiparams.data_folder,guiparams.data_files);
-            guiparams.savefile = savefile;
-            guiparams.A        = A;
-            guiparams.z        = z;
-            setappdata(handles.figure1,'guiparams',guiparams)
-            
-            
-            % Update the GUI:
-            % ---------------
-            set_enable(handles,'fileloaded')
-        end  
-    case 'shiftcontroll' % Call SontekMAT2KML
-        SontekMAT2KML;
     case 'f1' % Call the VMT UsersGuide
         menuUsersGuide_Callback(hObject, eventdata, handles)
         
@@ -5836,4 +5545,3 @@ switch input
     otherwise
         %disp(input)
 end
-

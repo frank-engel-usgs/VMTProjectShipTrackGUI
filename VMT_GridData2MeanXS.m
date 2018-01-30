@@ -30,7 +30,12 @@ end
 % adjusted (this is important for user that want to output to a model
 % grid). A fragment of length<xgdspc may be truncated. The impact on this
 % for data analysis should be minor.
-V.mcsDist               = 0:xgdspc:V.dl;
+switch V.startBank
+    case 'right_bank'
+        V.mcsDist = 0:xgdspc:V.dl;
+    otherwise % left bank or auto
+        V.mcsDist = 0:xgdspc:V.dl;
+end
 for zi = 1:z
     minDepth(zi) = min(A(zi).Wat.binDepth(:));
     maxDepth(zi) = max(A(zi).Wat.binDepth(:));
@@ -132,33 +137,49 @@ for zi = 1 : z
     vN      = A(zi).Clean.vNorth(:,A(zi).Comp.vecmap);
     vV      = A(zi).Clean.vVert(:,A(zi).Comp.vecmap);
     vEr     = A(zi).Clean.vError(:,A(zi).Comp.vecmap);
-    enstime = repmat(datenum([A(zi).Sup.year+2000 A(zi).Sup.month A(zi).Sup.day...
-        A(zi).Sup.hour A(zi).Sup.minute (A(zi).Sup.second+A(zi).Sup.sec100./100)])',nrows,1);
+    enstime = datenum(...
+        [A(zi).Sup.year(A(zi).Comp.vecmap)+2000,...
+        A(zi).Sup.month(A(zi).Comp.vecmap),...
+        A(zi).Sup.day(A(zi).Comp.vecmap),...
+        A(zi).Sup.hour(A(zi).Comp.vecmap),...
+        A(zi).Sup.minute(A(zi).Comp.vecmap),...
+        (A(zi).Sup.second(A(zi).Comp.vecmap)+A(zi).Sup.sec100(A(zi).Comp.vecmap)./100)])';
+    A(zi).Comp.enstime = enstime;
+    enstime = repmat(enstime,nrows,1);
     
     % Create scatteredInterpolant class
-    F = TriScatteredInterp(X(valid),Y(valid),bs(valid));
-    
-    % Interpolate to each output
-    mcsBack  = F(XI,YI);
-    F.V      = vE(valid);
-    mcsEast  = F(XI,YI);
-    F.V      = vN(valid);
-    mcsNorth = F(XI,YI);
-    F.V      = vV(valid);
-    mcsVert  = F(XI,YI);
-    F.V      = vEr(valid);
-    mcsError = F(XI,YI);
-    F.V      = enstime(valid);
-    mcsTime  = F(XI,YI);
-    
-    % Reshape and save to outputs
-    A(zi).Comp.mcsBack  = reshape(mcsBack  ,size(V.mcsX));
-    A(zi).Comp.mcsEast  = reshape(mcsEast  ,size(V.mcsX));
-    A(zi).Comp.mcsNorth = reshape(mcsNorth ,size(V.mcsX));
-    A(zi).Comp.mcsVert  = reshape(mcsVert  ,size(V.mcsX));
-    A(zi).Comp.mcsError = reshape(mcsError ,size(V.mcsX));
-    A(zi).Comp.mcsTime  = reshape(mcsTime  ,size(V.mcsX));
-    
+    switch V.probeType
+        case 'RG'
+            A(zi).Comp.mcsBack  = interp2(X,Y,bs,V.mcsDist,V.mcsDepth);
+            A(zi).Comp.mcsEast  = interp2(X,Y,vE,V.mcsDist,V.mcsDepth);
+            A(zi).Comp.mcsNorth = interp2(X,Y,vN,V.mcsDist,V.mcsDepth);
+            A(zi).Comp.mcsVert  = interp2(X,Y,vV,V.mcsDist,V.mcsDepth);
+            A(zi).Comp.mcsError = interp2(X,Y,vEr,V.mcsDist,V.mcsDepth);
+            A(zi).Comp.mcsTime  = interp2(X,Y,enstime,V.mcsDist,V.mcsDepth);
+        otherwise
+            F = TriScatteredInterp(X(valid),Y(valid),bs(valid));
+            
+            % Interpolate to each output
+            mcsBack  = F(XI,YI);
+            F.V      = vE(valid);
+            mcsEast  = F(XI,YI);
+            F.V      = vN(valid);
+            mcsNorth = F(XI,YI);
+            F.V      = vV(valid);
+            mcsVert  = F(XI,YI);
+            F.V      = vEr(valid);
+            mcsError = F(XI,YI);
+            F.V      = enstime(valid);
+            mcsTime  = F(XI,YI);
+            
+            % Reshape and save to outputs
+            A(zi).Comp.mcsBack  = reshape(mcsBack  ,size(V.mcsX));
+            A(zi).Comp.mcsEast  = reshape(mcsEast  ,size(V.mcsX));
+            A(zi).Comp.mcsNorth = reshape(mcsNorth ,size(V.mcsX));
+            A(zi).Comp.mcsVert  = reshape(mcsVert  ,size(V.mcsX));
+            A(zi).Comp.mcsError = reshape(mcsError ,size(V.mcsX));
+            A(zi).Comp.mcsTime  = reshape(mcsTime  ,size(V.mcsX));
+    end
     %A(zi).Comp.mcsBack = interp2(A(zi).Comp.itDist, A(zi).Comp.itDepth, ...
     %    A(zi).Clean.bs(:,A(zi).Comp.vecmap),V.mcsDist, V.mcsDepth);
     %A(zi).Comp.mcsBack(A(zi).Comp.mcsBack>=255) = NaN;

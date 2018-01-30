@@ -24,23 +24,17 @@ log_text = {'   Processing Data...Please Be Patient.'};
 try
     %disp('Processing Data...')
     warning off
-    
-    if ~exist('start_bank','var')
-        start_bank = 'auto';
-    end
         
     %% Map ensembles to mean cross-section
+    start_bank='auto';
     [A,V,map_xs_log_text] = VMT_MapEns2MeanXS(z,A,setends,start_bank);
     %msgbox('Processing Data...Please Be Patient','VMT Status','help','replace');
     log_text = vertcat(log_text, map_xs_log_text);
     
     %% Set the probe type
-    if A(1).Sup.wm == 3 % RiverRay
-        V.probeType = 'RR';
-    else
-    %V.probeType = A(1).probeType;
-        V.probeType = 'RG';
-    end
+    % Possibilities are RioGrande (RG), StreamPro (SP), RiverRay (RR),
+    % SonTek M9 (M9), SonTek S5 (S5)
+    V.probeType = A(1).Sensor.sensor_type;
     
     %% Write bed elevation to V struct
     V.eta = eta;

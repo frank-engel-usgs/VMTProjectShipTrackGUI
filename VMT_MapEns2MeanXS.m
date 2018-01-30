@@ -115,8 +115,7 @@ end
 
 % First compute the normal unit vector to the mean
 % cross section
-N = [-dy/sqrt(dx^2+dy^2)...
-    dx/sqrt(dx^2+dy^2)];
+N = [-dy dx]./sqrt(dx^2+dy^2);
 
 % Compute the mean flow direction in the cross section. To do
 % this, we also have to convert from geographic angle to
@@ -133,6 +132,7 @@ vdif = acos(dot(N,M)/(norm(N)*norm(M)))*180/pi;
 % to be reversed before resolving the u,v coordinates
 if vdif >= 90
     N = -N;
+%     N = [dy -dx]./sqrt(dx^2+dy^2);
 end
 
 % Plot N and M to check (scale of the vectors is 10% of the
@@ -149,6 +149,8 @@ midx = xw+xrng/2;
 
 % Geographic angle of the normal vector to the cross section
 V.phi = ari2geodeg(cart2pol(N(1),N(2))*180/pi);
+V.N   = N;
+V.M   = M;
 
 clear x y stats whichstats zi
 
@@ -340,7 +342,7 @@ for zi = 1 : z
         for i = 1 : numberBreaks
             for j = idxBeginBracket(i)+1 : idxEndBracket(i)-1
                 % interpolate
-                if idxBeginBracket(i) > 0 && idxEndBracket(i) < length(A(zi).Nav.lat_deg)
+                if idxBeginBracket(i) > 0 && idxEndBracket(i) <= length(A(zi).Nav.lat_deg)
                     
                     den=(idxEndBracket(i)-idxBeginBracket(i));
                     num2=j-idxBeginBracket(i);
@@ -386,6 +388,7 @@ for zi = 1 : z
 end
 
 function V = setStation(V,start_bank)
+V.startBank = start_bank;
 switch start_bank
     case 'auto'
         V = leftStation(V);

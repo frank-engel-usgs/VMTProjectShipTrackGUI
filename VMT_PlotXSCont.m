@@ -1,4 +1,4 @@
-function [z,A,V,zmin,zmax,log_text,fig_contour_handle] = VMT_PlotXSCont(z,A,V,var,exag,plot_english,allow_flux_flip)
+function [z,A,V,zmin,zmax,log_text,fig_contour_handle] = VMT_PlotXSCont(z,A,V,var,exag,plot_english,allow_flux_flip,start_bank)
 % Plots contours for the variable 'var' within the mean cross section given
 % by the structure V. IF data is not supplied, user will be prompted to
 % load data (browse to data).
@@ -77,9 +77,32 @@ switch allow_flux_flip
         flipxs = 0;
 end
 
+% Determine vector sign convention based on start_bank
+% Add negative sign to reverse the +x direction (we take RHR with +x into
+% the page lookign DS, matlab uses opposite convention)
+% 
+% When the user selects a right start_bank, let the flipxs be turned on so
+% that the computations are correct. Otherwise, turn flipxs off. In the
+% plotting, use the start_bank to enable flipping of the XDir in the plot
+% ONLY if 'auto'
+switch start_bank
+    case 'right_bank'
+        flipxs = 1;
+    otherwise % 'left_bank' or 'auto'
+        flipxs = 0;
+end
+
 if flipxs 
     %disp(['Streamwise Flow Direction (Normal to mean XS; deg) = ' num2str(V.phi - 180)])
     %disp(['Primary Flow Direction (deg) = ' num2str(V.phisp - 180)])
+    strmwise = V.phi - 180;
+    pflowd = V.phisp - 180;
+    if strmwise < 0
+        strmwise = 360 + strmwise;
+    end
+    if pflowd < 0
+        pflowd = 360 + pflowd;
+    end
     msg_str_1 = {['   Streamwise Flow Direction (Normal to mean XS; deg) = ' num2str(V.phi - 180)];...
         ['   Primary Flow Direction (deg) = ' num2str(V.phisp - 180)]};
 else
@@ -288,24 +311,11 @@ switch plotref
             contour_handle = pcolor(V.mcsDist*3.281,V.mcsDepth*3.281,eval(wtp)*convfact); hold on
             shading interp
             %[~,contour_handle] = contour(V.mcsDist*3.281,V.mcsDepth*3.281,eval(wtp)*convfact,zlevs*convfact,'Fill','on','Linestyle','none'); hold on  %wtp(1,:)
-            % Plot the individual ADCP transect bed elevations
-            if 1 % testing a feature
-                for zi = 1:z
-                    ibed_handle(zi) = plot(V.mcsDist(1,:)*3.281,A(zi).Comp.mcsBed*3.281,':','Color', [.7 .7 .7]);
-                end
-            end
             bed_handle         = plot(V.mcsDist(1,:)*3.281,V.mcsBed*3.281,'w', 'LineWidth',2); hold on
         else
             contour_handle = pcolor(V.mcsDist,V.mcsDepth,eval(wtp)); hold on
             shading interp
             %[~,contour_handle] = contour(V.mcsDist,V.mcsDepth,eval(wtp),zlevs,'Fill','on','Linestyle','none'); hold on  %wtp(1,:)
-            
-            % Plot the individual ADCP transect bed elevations
-            if 1 % testing a feature
-                for zi = 1:z
-                    ibed_handle(zi) = plot(V.mcsDist(1,:),A(zi).Comp.mcsBed,':','Color', [.7 .7 .7]);
-                end
-            end
             bed_handle         = plot(V.mcsDist(1,:),V.mcsBed,'w', 'LineWidth',2); hold on
         end
         
@@ -404,7 +414,7 @@ switch plotref
             set(gca,'YDir','reverse')
             ylabel_handle = ylabel('Depth (ft)');
             xlabel_handle = xlabel('Distance (ft)');
-            if flipxs
+            if flipxs && strcmpi(start_bank,'auto')
                 set(gca,'XDir','reverse')
             end
         else
@@ -414,7 +424,7 @@ switch plotref
             set(gca,'YDir','reverse')
             ylabel_handle = ylabel('Depth (m)');
             xlabel_handle = xlabel('Distance (m)');
-            if flipxs
+            if flipxs && strcmpi(start_bank,'auto')
                 set(gca,'XDir','reverse')
             end
         end
@@ -426,7 +436,7 @@ switch plotref
             set(gca,'YDir','normal')
             ylabel_handle = ylabel('Height above bottom (ft)');
             xlabel_handle = xlabel('Distance (ft)');
-            if flipxs
+            if flipxs && strcmpi(start_bank,'auto')
                 set(gca,'XDir','reverse')
             end
         else
@@ -436,7 +446,7 @@ switch plotref
             set(gca,'YDir','normal')
             ylabel_handle = ylabel('Height above bottom (m)');
             xlabel_handle = xlabel('Distance (m)');
-            if flipxs
+            if flipxs && strcmpi(start_bank,'auto')
                 set(gca,'XDir','reverse')
             end
         end

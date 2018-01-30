@@ -118,8 +118,10 @@ for n=1:zf
         % there is a chance the results returns no data. If that's the
         % case, throw a warning and return.
         if all(isnan(V.mcsEast(:))) && all(isnan(V.mcsNorth(:)))
-            warndlg('User defined depth range returns no data. Try a different range.','Warning: Depth range error')
-            return
+            if ~mapmult
+                warndlg('User defined depth range returns no data. Try a different range.','Warning: Depth range error')
+                return
+            end
         end
 %         if n == 1
 %             if plot_english
@@ -287,7 +289,7 @@ else  %plot in metric units
     if sum(~isnan(vr)) == 0
         errordlg('No Data in Specified Depth Range','Plotting Error');
     end
-    log_text = {sprintf('   DAV range: %6.3f to %6.3f m/s', nanmin(vr),nanmax(vr))};
+    log_text = {sprintf('   DAV range: %6.3f to %6.3f cm/s', nanmin(vr),nanmax(vr))};
     
     % Reset the color bar axis from 0 to 64 to span the velocity mag range
     if ~isempty(minrng)
