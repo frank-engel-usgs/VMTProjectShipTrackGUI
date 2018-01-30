@@ -273,7 +273,7 @@ for zi = 1:z
         for j = 1:A(zi).Sup.noe
             origLength(j) = A(zi).Nav.length(j);
             Ratio(j)      = origLength(j)/nanmax(A(zi).Nav.length);
-            adjLength(j)  = dl2*Ratio(j);
+            adjLength(j)  = dl2(zi)*Ratio(j);
         end
         
         % Traverse the ADCP probe along the cross section using the
