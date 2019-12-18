@@ -3,7 +3,7 @@ VMT
 
 The Velocity Mapping Toolbox: Project ShipTrack Mod
 
-A Matlab-based program for visualization and analysis of moving boat ADCP data. This is a modified version of the full VMT v4.09 that enables processing of TRDI ADCP data without GPS. See the full instructions and caveats in the file [https://github.com/frank-engel-usgs/VMTProjectShipTrackGUI/blob/master/VMT%20Project%20ShipTracks%20Instructions.pdf](VMT Project ShipTracks Instructions). Absolutely *no support* is given. This is a custom one-off tool I made for a specific project. It has been shared with other people, with some sucess, but I unfortunately cannot support bug or feature requests for this modification at this time. 
+A Matlab-based program for visualization and analysis of moving boat ADCP data. This is a modified version of the full VMT v4.09 that enables processing of TRDI ADCP data without GPS. See the full instructions and caveats in the file [VMT Project ShipTracks Instructions](https://github.com/frank-engel-usgs/VMTProjectShipTrackGUI/blob/master/VMT%20Project%20ShipTracks%20Instructions.pdf). Absolutely *no support* is given. This is a custom one-off tool I made for a specific project. It has been shared with other people, with some sucess, but I unfortunately cannot support bug or feature requests for this modification at this time. 
 
 Notes
 -----
@@ -26,7 +26,7 @@ I have compiled a tool that may help you to project the ADCP bottom track data i
 ```
 The file "VMT_ProjectShipTrackGUI.exe" file runs using the same Matlab MCR that VMT uses. I highly recommend running the file from a command/bash window, as the code will output important information to this window as it runs. If you do not run the code from the command line, you will not see these data. When VMT_ProjectShipTrackGUI.exe opens, it looks like this:
 
-IMAGE HERE
+![VMT_ProjectShipTick GUI](https://github.com/frank-engel-usgs/VMTProjectShipTrackGUI/blob/master/guiImage.png?raw=true)
 
 1. Enter the Lat/Lon coordinates of the endpoints for your cross section in the 4 boxes at the top
 2. Use the "Select Files" button to choose the ASCII data from WinRiver containing BOTTOM TRACK referenced data. You can load multiple ASCII files corresponding to ONE cross section
@@ -36,7 +36,7 @@ IMAGE HERE
 
 This action will create a VMT v4.xx compliant MAT file that can be loaded into the program normally. As the program runs, it will send some text info to the command window:
 
-IMAGE 2 HERE
+![Command Line example output](https://github.com/frank-engel-usgs/VMTProjectShipTrackGUI/blob/master/commandline.png?raw=true)
 
 Be sure to look at the data below "Transect pass X". The code compares the dead reckoning distance (Distance made good, or DMG) reported by bottom track against the estimation method. Large errors can result from this process, especially if the bed is mobile, or more than 5% of the bottom track data is bad. I would not trust this method in cases where the Percent error reported are greater than 5% without a firm understanding of the impacts on your data. Note that:
 
