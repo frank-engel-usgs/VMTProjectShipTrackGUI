@@ -71,7 +71,7 @@ end
 guidata(hObject, handles);
 
 % Create GUI Parameters
-guiparams.version = {'v1.00'; 'r20160204'};
+guiparams.version = {'v2.00'; 'r20180130'};
 guiparams.horizontal_smoothing_window   = 1;
 guiparams.vertical_smoothing_window     = 1;
 guiparams.water_surface_elevation       = 0;
