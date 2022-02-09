@@ -34,7 +34,8 @@ try
     %% Set the probe type
     % Possibilities are RioGrande (RG), StreamPro (SP), RiverRay (RR),
     % SonTek M9 (M9), SonTek S5 (S5)
-    V.probeType = A(1).Sensor.sensor_type;
+    %V.probeType = A(1).Sensor.sensor_type;
+    V.probeType = 'RR';                     %%%% FLE Changed: keeps dumping errors, so force the newer inter schema 2/9/22
     
     %% Write bed elevation to V struct
     V.eta = eta;

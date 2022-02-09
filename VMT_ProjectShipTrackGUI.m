@@ -71,7 +71,7 @@ end
 guidata(hObject, handles);
 
 % Create GUI Parameters
-guiparams.version = {'v2.00'; 'r20180130'};
+guiparams.version = {'v2.10'; 'r20220209'};
 guiparams.horizontal_smoothing_window   = 1;
 guiparams.vertical_smoothing_window     = 1;
 guiparams.water_surface_elevation       = 0;
@@ -298,6 +298,11 @@ A = VMT_PreProcess(z,A);
 % Run the VMT Processing Engine
 start_bank = 'auto';
 [A,V,log_text] = VMT_ProcessTransects(z,A,setends,unitQcorrection,start_bank);
+
+% Force a RR probe type so that the newer interpolation scheme is always
+% used. This avoids interp2 meshgrid errors, which seem to arise a lot when
+% there are very nearby ensembles forced the the MCS line. FLE 2/9/22
+A(1).Sensor.sensor_type = 'RR';
 
 % Save the workspace as a MAT file. This MAT file can be processed
 % normally by VMT v4.

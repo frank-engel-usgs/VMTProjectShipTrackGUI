@@ -74,7 +74,11 @@ xrng = xe - xw;
 yrng = yn - ys;
 
 if xrng >= yrng %Fit based on coordinate with larger range of values (original fitting has issues with N-S lines because of repeated X values), PRJ 12-12-08
-    [P,S] = polyfit(x,y,1);
+    % Make sure we only have unique points in the fit
+    Z = [x,y];
+    Z = unique(Z, 'rows', 'stable');
+    x = Z(:,1); y = Z(:,2);
+    [P,S] = polyfit(x(1:5:end),y(1:5:end),1);
 %     figure(1); hold on; 
 %     plot(x,polyval(P,x),'g-')
     V.m = P(1);
@@ -82,7 +86,10 @@ if xrng >= yrng %Fit based on coordinate with larger range of values (original f
     dx = xe-xw;
     dy = polyval(P,xe)-polyval(P,xw);
 else
-    [P,S] = polyfit(y,x,1);
+    Z = [x,y];
+    Z = unique(Z, 'rows', 'stable');
+    x = Z(:,1); y = Z(:,2);
+    [P,S] = polyfit(y(1:5:end),x(1:5:end),1);
 %     figure(1); hold on; 
 %     plot(polyval(P,y),y,'g-')
     V.m = 1/P(1);           %Reformat slope and intercept in terms of y= fn(x) rather than x = fn(y)
